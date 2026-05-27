@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
-import { Search, SlidersHorizontal, X } from "lucide-react"
+import { Search, SlidersHorizontal, X, Grid3X3, List } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { DestinationCard } from "@/components/destinations/destination-card"
@@ -26,7 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { destinations, categories } from "@/data/destinations"
+import { destinations, categories, priceRanges } from "@/data/destinations"
 import { cn } from "@/lib/utils"
 
 const riskLevels = ["Baixo", "Moderado", "Alto", "Extremo"]
@@ -40,9 +40,9 @@ const sortOptions = [
 
 export default function ExplorarPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedRisks, setSelectedRisks] = useState<string[]>([])
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 300000000])
+  const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all")
   const [sortBy, setSortBy] = useState("popularity")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -61,7 +61,7 @@ export default function ExplorarPage() {
       }
 
       // Category filter
-      if (selectedCategories.length > 0 && !selectedCategories.includes(destination.category)) {
+      if (selectedCategory !== "all" && destination.category !== selectedCategory) {
         return false
       }
 
@@ -71,8 +71,11 @@ export default function ExplorarPage() {
       }
 
       // Price filter
-      if (destination.price < priceRange[0] || destination.price > priceRange[1]) {
-        return false
+      if (selectedPriceRange !== "all") {
+        const range = priceRanges.find(r => r.id === selectedPriceRange)
+        if (range && (destination.price < range.min || destination.price > range.max)) {
+          return false
+        }
       }
 
       return true
@@ -97,20 +100,18 @@ export default function ExplorarPage() {
     }
 
     return filtered
-  }, [searchQuery, selectedCategories, selectedRisks, priceRange, sortBy])
+  }, [searchQuery, selectedCategory, selectedRisks, selectedPriceRange, sortBy])
 
-  const activeFiltersCount = selectedCategories.length + selectedRisks.length + (priceRange[0] > 0 || priceRange[1] < 300000000 ? 1 : 0)
+  const activeFiltersCount = 
+    (selectedCategory !== "all" ? 1 : 0) + 
+    selectedRisks.length + 
+    (selectedPriceRange !== "all" ? 1 : 0)
 
   const clearFilters = () => {
-    setSelectedCategories([])
+    setSelectedCategory("all")
     setSelectedRisks([])
-    setPriceRange([0, 300000000])
-  }
-
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
-    )
+    setSelectedPriceRange("all")
+    setSearchQuery("")
   }
 
   const toggleRisk = (risk: string) => {
@@ -119,123 +120,85 @@ export default function ExplorarPage() {
     )
   }
 
-  const formatPrice = (price: number) => {
-    if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(0)}M`
-    }
-    return `$${(price / 1000).toFixed(0)}K`
-  }
-
-  const FilterContent = () => (
-    <div className="space-y-8">
-      {/* Categories */}
-      <div>
-        <h3 className="font-semibold mb-4">Categoria</h3>
-        <div className="space-y-3">
-          {categories.map((category) => (
-            <div key={category.id} className="flex items-center space-x-3">
-              <Checkbox
-                id={category.id}
-                checked={selectedCategories.includes(category.id)}
-                onCheckedChange={() => toggleCategory(category.id)}
-              />
-              <Label htmlFor={category.id} className="flex-1 cursor-pointer">
-                <span className="block font-medium">{category.name}</span>
-                <span className="block text-xs text-muted-foreground">{category.description}</span>
-              </Label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Price Range */}
-      <div>
-        <h3 className="font-semibold mb-4">Faixa de Preço</h3>
-        <div className="space-y-4">
-          <Slider
-            value={priceRange}
-            onValueChange={(value) => setPriceRange(value as [number, number])}
-            min={0}
-            max={300000000}
-            step={100000}
-            className="w-full"
-          />
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>{formatPrice(priceRange[0])}</span>
-            <span>{formatPrice(priceRange[1])}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Risk Level */}
-      <div>
-        <h3 className="font-semibold mb-4">Nível de Risco</h3>
-        <div className="space-y-3">
-          {riskLevels.map((risk) => (
-            <div key={risk} className="flex items-center space-x-3">
-              <Checkbox
-                id={risk}
-                checked={selectedRisks.includes(risk)}
-                onCheckedChange={() => toggleRisk(risk)}
-              />
-              <Label htmlFor={risk} className="cursor-pointer">{risk}</Label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Clear Filters */}
-      {activeFiltersCount > 0 && (
-        <Button variant="outline" onClick={clearFilters} className="w-full">
-          Limpar Filtros
-        </Button>
-      )}
-    </div>
-  )
-
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-background">
       <Header />
 
       <div className="pt-24 pb-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="mb-12"
+            transition={{ duration: 0.4 }}
+            className="mb-8"
           >
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-              Explorar <span className="text-gradient">Destinos</span>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+              Catálogo de Experiências
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl">
-              Descubra experiências espaciais únicas, desde voos suborbitais de minutos 
-              até expedições interplanetárias de anos.
+            <p className="text-muted-foreground">
+              {destinations.length} experiências disponíveis em {categories.length - 1} categorias
             </p>
           </motion.div>
 
-          {/* Search and Filters */}
+          {/* Category Tabs */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="flex flex-col sm:flex-row gap-4 mb-8"
+            transition={{ duration: 0.4, delay: 0.05 }}
+            className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide"
+          >
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
+                  selectedCategory === category.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                )}
+              >
+                {category.name}
+              </button>
+            ))}
+          </motion.div>
+
+          {/* Search and Filters Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="flex flex-col sm:flex-row gap-3 mb-6"
           >
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar destinos..."
+                placeholder="Buscar por nome ou descrição..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-card border-border"
+                className="pl-10 bg-card"
               />
             </div>
 
+            {/* Price Range Select */}
+            <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
+              <SelectTrigger className="w-full sm:w-44 bg-card">
+                <SelectValue placeholder="Preço" />
+              </SelectTrigger>
+              <SelectContent>
+                {priceRanges.map((range) => (
+                  <SelectItem key={range.id} value={range.id}>
+                    {range.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48 bg-card">
+              <SelectTrigger className="w-full sm:w-44 bg-card">
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
@@ -247,14 +210,14 @@ export default function ExplorarPage() {
               </SelectContent>
             </Select>
 
-            {/* Mobile Filter Button */}
+            {/* More Filters Button */}
             <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="lg:hidden gap-2">
+                <Button variant="outline" className="gap-2">
                   <SlidersHorizontal className="h-4 w-4" />
-                  Filtros
+                  <span className="hidden sm:inline">Mais Filtros</span>
                   {activeFiltersCount > 0 && (
-                    <Badge variant="secondary" className="ml-1">
+                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
                       {activeFiltersCount}
                     </Badge>
                   )}
@@ -262,10 +225,32 @@ export default function ExplorarPage() {
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:w-96">
                 <SheetHeader>
-                  <SheetTitle>Filtros</SheetTitle>
+                  <SheetTitle>Filtros Avançados</SheetTitle>
                 </SheetHeader>
-                <div className="mt-6">
-                  <FilterContent />
+                <div className="mt-6 space-y-6">
+                  {/* Risk Level */}
+                  <div>
+                    <h3 className="font-medium mb-3">Nível de Risco</h3>
+                    <div className="space-y-2">
+                      {riskLevels.map((risk) => (
+                        <div key={risk} className="flex items-center space-x-3">
+                          <Checkbox
+                            id={risk}
+                            checked={selectedRisks.includes(risk)}
+                            onCheckedChange={() => toggleRisk(risk)}
+                          />
+                          <Label htmlFor={risk} className="cursor-pointer text-sm">{risk}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Clear Filters */}
+                  {activeFiltersCount > 0 && (
+                    <Button variant="outline" onClick={clearFilters} className="w-full">
+                      Limpar Todos os Filtros
+                    </Button>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
@@ -276,19 +261,29 @@ export default function ExplorarPage() {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="flex flex-wrap gap-2 mb-8"
+              className="flex flex-wrap items-center gap-2 mb-6"
             >
-              {selectedCategories.map((cat) => (
+              <span className="text-sm text-muted-foreground">Filtros ativos:</span>
+              {selectedCategory !== "all" && (
                 <Badge
-                  key={cat}
                   variant="secondary"
                   className="gap-1 cursor-pointer"
-                  onClick={() => toggleCategory(cat)}
+                  onClick={() => setSelectedCategory("all")}
                 >
-                  {categories.find((c) => c.id === cat)?.name}
+                  {categories.find((c) => c.id === selectedCategory)?.name}
                   <X className="h-3 w-3" />
                 </Badge>
-              ))}
+              )}
+              {selectedPriceRange !== "all" && (
+                <Badge
+                  variant="secondary"
+                  className="gap-1 cursor-pointer"
+                  onClick={() => setSelectedPriceRange("all")}
+                >
+                  {priceRanges.find((r) => r.id === selectedPriceRange)?.name}
+                  <X className="h-3 w-3" />
+                </Badge>
+              )}
               {selectedRisks.map((risk) => (
                 <Badge
                   key={risk}
@@ -296,69 +291,50 @@ export default function ExplorarPage() {
                   className="gap-1 cursor-pointer"
                   onClick={() => toggleRisk(risk)}
                 >
-                  Risco: {risk}
+                  {risk}
                   <X className="h-3 w-3" />
                 </Badge>
               ))}
-              {(priceRange[0] > 0 || priceRange[1] < 300000000) && (
-                <Badge
-                  variant="secondary"
-                  className="gap-1 cursor-pointer"
-                  onClick={() => setPriceRange([0, 300000000])}
-                >
-                  {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
-                  <X className="h-3 w-3" />
-                </Badge>
-              )}
+              <button 
+                onClick={clearFilters}
+                className="text-sm text-primary hover:underline"
+              >
+                Limpar todos
+              </button>
             </motion.div>
           )}
 
-          <div className="flex gap-8">
-            {/* Desktop Sidebar Filters */}
-            <motion.aside
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="hidden lg:block w-72 shrink-0"
-            >
-              <div className="glass rounded-2xl p-6 sticky top-24">
-                <h2 className="font-semibold text-lg mb-6">Filtros</h2>
-                <FilterContent />
-              </div>
-            </motion.aside>
-
-            {/* Results */}
-            <div className="flex-1">
-              {/* Results count */}
-              <div className="mb-6 text-sm text-muted-foreground">
-                {filteredDestinations.length} destino{filteredDestinations.length !== 1 ? "s" : ""} encontrado{filteredDestinations.length !== 1 ? "s" : ""}
-              </div>
-
-              {/* Grid */}
-              {filteredDestinations.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredDestinations.map((destination, index) => (
-                    <DestinationCard
-                      key={destination.id}
-                      destination={destination}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16">
-                  <div className="text-6xl mb-4">🔭</div>
-                  <h3 className="text-xl font-semibold mb-2">Nenhum destino encontrado</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Tente ajustar seus filtros ou buscar por outro termo.
-                  </p>
-                  <Button variant="outline" onClick={clearFilters}>
-                    Limpar Filtros
-                  </Button>
-                </div>
-              )}
-            </div>
+          {/* Results Info */}
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm text-muted-foreground">
+              {filteredDestinations.length} resultado{filteredDestinations.length !== 1 ? "s" : ""}
+              {searchQuery && ` para "${searchQuery}"`}
+            </p>
           </div>
+
+          {/* Grid */}
+          {filteredDestinations.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {filteredDestinations.map((destination, index) => (
+                <DestinationCard
+                  key={destination.id}
+                  destination={destination}
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-xl border border-border">
+              <div className="text-4xl mb-4">🔭</div>
+              <h3 className="text-lg font-semibold mb-2">Nenhum destino encontrado</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Tente ajustar seus filtros ou buscar por outro termo.
+              </p>
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Limpar Filtros
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

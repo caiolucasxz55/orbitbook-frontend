@@ -2,23 +2,28 @@
 
 import { motion, useInView } from "framer-motion"
 import { useRef, useEffect, useState } from "react"
-import { stats } from "@/data/destinations"
 
-function AnimatedCounter({ value, suffix = "" }: { value: string; suffix?: string }) {
+const stats = [
+  { value: "2.847", label: "Viajantes Espaciais" },
+  { value: "15", label: "Destinos Disponíveis" },
+  { value: "99.8%", label: "Taxa de Segurança" },
+  { value: "7", label: "Operadores Parceiros" },
+]
+
+function AnimatedCounter({ value }: { value: string }) {
   const [count, setCount] = useState(0)
   const ref = useRef<HTMLSpanElement>(null)
   const isInView = useInView(ref, { once: true })
   
-  // Extract number from value string
   const numericValue = parseFloat(value.replace(/[^0-9.]/g, ""))
   const hasDecimal = value.includes(".")
-  const prefix = value.match(/^\D*/)?.[0] || ""
-  const valueSuffix = value.match(/\D*$/)?.[0] || ""
+  const prefix = value.match(/^[^0-9]*/)?.[0] || ""
+  const suffix = value.match(/[^0-9.]*$/)?.[0] || ""
 
   useEffect(() => {
     if (isInView) {
-      const duration = 2000
-      const steps = 60
+      const duration = 1500
+      const steps = 40
       const increment = numericValue / steps
       let current = 0
       
@@ -40,32 +45,29 @@ function AnimatedCounter({ value, suffix = "" }: { value: string; suffix?: strin
     <span ref={ref}>
       {prefix}
       {hasDecimal ? count.toFixed(1) : Math.floor(count).toLocaleString("pt-BR")}
-      {valueSuffix}
+      {suffix}
     </span>
   )
 }
 
 export function StatsSection() {
   return (
-    <section className="py-20 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
-      
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+    <section className="py-16 border-y border-border bg-card/30">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              transition={{ duration: 0.4, delay: index * 0.1 }}
               className="text-center"
             >
-              <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gradient mb-2">
+              <div className="text-3xl sm:text-4xl font-bold text-foreground mb-1">
                 <AnimatedCounter value={stat.value} />
               </div>
-              <div className="text-sm sm:text-base text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 {stat.label}
               </div>
             </motion.div>

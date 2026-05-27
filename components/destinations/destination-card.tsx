@@ -11,52 +11,67 @@ import type { Destination, Badge as BadgeType } from "@/types"
 interface DestinationCardProps {
   destination: Destination
   index?: number
+  variant?: "default" | "compact"
 }
 
 const badgeStyles: Record<BadgeType["type"], string> = {
-  popular: "bg-primary/20 text-primary border-primary/30",
-  new: "bg-accent/20 text-accent border-accent/30",
-  lastSeats: "bg-destructive/20 text-destructive border-destructive/30",
-  exclusive: "bg-gradient-to-r from-primary/20 to-accent/20 text-foreground border-primary/30",
-  promoted: "bg-chart-5/20 text-chart-5 border-chart-5/30",
+  popular: "bg-chart-5/10 text-chart-5 border-chart-5/20",
+  new: "bg-accent/10 text-accent border-accent/20",
+  lastSeats: "bg-destructive/10 text-destructive border-destructive/20",
+  exclusive: "bg-primary/10 text-primary border-primary/20",
+  promoted: "bg-chart-5/10 text-chart-5 border-chart-5/20",
 }
 
-export function DestinationCard({ destination, index = 0 }: DestinationCardProps) {
+export function DestinationCard({ destination, index = 0, variant = "default" }: DestinationCardProps) {
   const formatPrice = (price: number) => {
+    if (price >= 1000000000) {
+      return `$${(price / 1000000000).toFixed(1)}B`
+    }
     if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M`
+      return `$${(price / 1000000).toFixed(0)}M`
     }
     return `$${(price / 1000).toFixed(0)}K`
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      whileHover={{ y: -4 }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
       className="group"
     >
       <Link href={`/destino/${destination.slug}`}>
-        <div className="glass rounded-2xl overflow-hidden transition-all duration-300 hover:border-primary/50">
+        <div className="bg-card rounded-xl overflow-hidden border border-border transition-colors hover:border-primary/30">
           {/* Image */}
-          <div className="relative aspect-[4/3] overflow-hidden">
+          <div className="relative aspect-[16/10] overflow-hidden">
             <Image
               src={destination.heroImage}
               alt={destination.name}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
             
+            {/* Category Badge */}
+            <div className="absolute top-3 left-3">
+              <span className="px-2 py-1 rounded text-xs font-medium bg-background/80 backdrop-blur-sm text-foreground">
+                {destination.category === "suborbital" && "Suborbital"}
+                {destination.category === "leo" && "Órbita Terrestre"}
+                {destination.category === "lunar" && "Lunar"}
+                {destination.category === "mars" && "Marte"}
+                {destination.category === "deepspace" && "Espaço Profundo"}
+                {destination.category === "training" && "Treinamento"}
+              </span>
+            </div>
+
             {/* Badges */}
             {destination.badges.length > 0 && (
-              <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                {destination.badges.slice(0, 2).map((badge) => (
+              <div className="absolute top-3 right-3 flex flex-wrap gap-1.5 justify-end">
+                {destination.badges.slice(0, 1).map((badge) => (
                   <Badge
                     key={badge.type}
                     variant="outline"
-                    className={cn("text-xs font-medium", badgeStyles[badge.type])}
+                    className={cn("text-xs", badgeStyles[badge.type])}
                   >
                     {badge.label}
                   </Badge>
@@ -66,30 +81,29 @@ export function DestinationCard({ destination, index = 0 }: DestinationCardProps
 
             {/* Price */}
             <div className="absolute bottom-3 right-3">
-              <div className="glass-strong px-3 py-1.5 rounded-lg">
-                <span className="text-lg font-bold">{formatPrice(destination.price)}</span>
-                <span className="text-xs text-muted-foreground ml-1">USD</span>
+              <div className="px-2.5 py-1 rounded-lg bg-background/90 backdrop-blur-sm">
+                <span className="text-base font-semibold">{formatPrice(destination.price)}</span>
               </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="p-5">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors">
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors line-clamp-1">
                 {destination.name}
               </h3>
               <div className="flex items-center gap-1 shrink-0">
-                <Star className="h-4 w-4 fill-chart-5 text-chart-5" />
+                <Star className="h-3.5 w-3.5 fill-chart-5 text-chart-5" />
                 <span className="text-sm font-medium">{destination.rating}</span>
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
               {destination.tagline}
             </p>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 <span>{destination.duration}</span>
@@ -98,10 +112,12 @@ export function DestinationCard({ destination, index = 0 }: DestinationCardProps
                 <MapPin className="h-3.5 w-3.5" />
                 <span>{destination.distance}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" />
-                <span>{destination.availability} vagas</span>
-              </div>
+              {destination.availability > 0 && (
+                <div className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>{destination.availability} vagas</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

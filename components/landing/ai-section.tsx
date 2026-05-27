@@ -2,74 +2,66 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Sparkles, Brain, MessageSquare, Zap, ArrowRight } from "lucide-react"
+import { Sparkles, MessageSquare, Zap, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const features = [
   {
-    icon: Brain,
-    title: "Recomendações Inteligentes",
-    description: "Nossa IA analisa seu perfil, preferências e requisitos físicos para sugerir os destinos perfeitos para você.",
+    icon: Sparkles,
+    title: "Recomendações Personalizadas",
+    description: "Análise de perfil e preferências para sugerir os destinos ideais.",
   },
   {
     icon: MessageSquare,
     title: "Assistente 24/7",
-    description: "Tire dúvidas sobre requisitos, treinamento, segurança e prepare-se para sua viagem a qualquer momento.",
+    description: "Tire dúvidas sobre requisitos, treinamento e segurança.",
   },
   {
     icon: Zap,
     title: "Respostas Instantâneas",
-    description: "Obtenha informações detalhadas sobre qualquer destino ou procedimento em segundos.",
+    description: "Informações detalhadas sobre qualquer destino em segundos.",
   },
 ]
 
 export function AISection() {
   return (
-    <section className="py-24 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-card/50 to-background" />
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[200px]" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[200px]" />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+    <section className="py-20 bg-card/30">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
           <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
           >
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-accent mb-4">
-              <Sparkles className="h-4 w-4" />
-              Tecnologia OrbitBook
+            <span className="text-sm font-medium text-primary mb-3 block">
+              Assistente Virtual
             </span>
-            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
-              Seu assistente espacial
-              <span className="text-gradient block">movido por IA</span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              Planeje sua viagem com ajuda de IA
             </h2>
-            <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Navegue pelo universo do turismo espacial com ajuda de inteligência artificial 
-              avançada. Desde escolher seu destino até preparar-se para o lançamento, 
-              nosso assistente está sempre pronto para ajudar.
+            <p className="text-muted-foreground mb-8 leading-relaxed">
+              Nosso assistente inteligente ajuda você a escolher o destino ideal, 
+              entender os requisitos e se preparar para sua aventura espacial.
             </p>
 
             {/* Features */}
-            <div className="space-y-6 mb-8">
+            <div className="space-y-4 mb-8">
               {features.map((feature, index) => (
                 <motion.div
                   key={feature.title}
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -16 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="flex gap-4"
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  className="flex gap-3"
                 >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                    <feature.icon className="h-6 w-6 text-accent" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <feature.icon className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">{feature.title}</h3>
+                    <h3 className="font-medium mb-0.5">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground">{feature.description}</p>
                   </div>
                 </motion.div>
@@ -77,7 +69,7 @@ export function AISection() {
             </div>
 
             <Link href="/assistente">
-              <Button size="lg" className="gap-2">
+              <Button className="gap-2">
                 Conversar com a IA
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -86,77 +78,49 @@ export function AISection() {
 
           {/* Chat Preview */}
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative"
+            transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <div className="glass rounded-2xl p-6 gradient-border">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border/50">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-primary-foreground" />
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold">Orbit AI</h4>
-                  <span className="text-xs text-muted-foreground">Online agora</span>
+                  <h4 className="font-medium text-sm">Orbit AI</h4>
+                  <span className="text-xs text-muted-foreground">Online</span>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="space-y-4">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.4 }}
-                  className="flex justify-end"
-                >
-                  <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-md px-4 py-2 max-w-[80%]">
-                    <p className="text-sm">Qual é a melhor opção para quem nunca foi ao espaço?</p>
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <div className="bg-primary text-primary-foreground rounded-xl rounded-tr-sm px-3.5 py-2 max-w-[85%]">
+                    <p className="text-sm">Qual a melhor opção para iniciantes?</p>
                   </div>
-                </motion.div>
+                </div>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.6 }}
-                  className="flex"
-                >
-                  <div className="bg-secondary rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%]">
+                <div className="flex">
+                  <div className="bg-secondary rounded-xl rounded-tl-sm px-3.5 py-2.5 max-w-[90%]">
                     <p className="text-sm leading-relaxed">
-                      Para sua primeira experiência espacial, recomendo o <strong>Voo Suborbital Aurora</strong>! 
-                      É perfeito para iniciantes: apenas 2 dias de treinamento, requisitos físicos acessíveis, 
-                      e você experimentará 4 minutos de microgravidade com uma vista incrível da Terra. ✨
+                      Para iniciantes, recomendo o <strong>Voo Suborbital Aurora</strong>. 
+                      Apenas 2 dias de treinamento, requisitos acessíveis e 4 minutos de 
+                      microgravidade com vista incrível da Terra.
                     </p>
                   </div>
-                </motion.div>
+                </div>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.8 }}
-                  className="flex flex-wrap gap-2"
-                >
-                  {["Ver detalhes", "Requisitos", "Agendar"].map((label) => (
-                    <Button key={label} variant="outline" size="sm" className="text-xs">
+                <div className="flex gap-2">
+                  {["Ver detalhes", "Requisitos"].map((label) => (
+                    <Button key={label} variant="outline" size="sm" className="text-xs h-7">
                       {label}
                     </Button>
                   ))}
-                </motion.div>
+                </div>
               </div>
             </div>
-
-            {/* Floating elements */}
-            <motion.div
-              animate={{ y: [-5, 5, -5] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              className="absolute -top-4 -right-4 w-20 h-20 rounded-xl glass flex items-center justify-center"
-            >
-              <span className="text-3xl">🚀</span>
-            </motion.div>
           </motion.div>
         </div>
       </div>
