@@ -398,7 +398,7 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="sticky top-24"
               >
-                <div className="glass rounded-2xl p-6 gradient-border">
+                <div className="glass rounded-2xl p-6 border border-border/50">
                   {/* Price */}
                   <div className="mb-6">
                     <div className="flex items-baseline gap-2">
@@ -452,7 +452,7 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                   {/* CTA Buttons */}
                   <div className="space-y-3">
                     <Link href={`/checkout/${destination.slug}`} className="block">
-                      <Button size="lg" className="w-full glow">
+                      <Button size="lg" className="w-full">
                         Reservar Agora
                       </Button>
                     </Link>

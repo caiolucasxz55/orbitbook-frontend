@@ -13,8 +13,8 @@ export const mockUser: User = {
   upcomingBookings: [
     {
       id: "booking-001",
-      destinationId: "leo-station-01",
-      destination: destinations.find(d => d.id === "leo-station-01")!,
+      destinationId: "leo-01",
+      destination: destinations.find(d => d.id === "leo-01")!,
       userId: "user-001",
       status: "confirmed",
       passengers: 1,
@@ -39,8 +39,8 @@ export const mockUser: User = {
     },
     {
       id: "booking-003",
-      destinationId: "suborbital-01",
-      destination: destinations.find(d => d.id === "suborbital-01")!,
+      destinationId: "suborbital-02",
+      destination: destinations.find(d => d.id === "suborbital-02")!,
       userId: "user-001",
       status: "completed",
       passengers: 2,

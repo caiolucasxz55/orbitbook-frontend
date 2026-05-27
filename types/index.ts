@@ -17,7 +17,7 @@ export interface Destination {
   reviewCount: number
   availability: number
   maxCapacity: number
-  category: "suborbital" | "leo" | "lunar" | "mars"
+  category: "suborbital" | "leo" | "lunar" | "mars" | "deepspace" | "training"
   badges: Badge[]
   requirements: string[]
   highlights: string[]
