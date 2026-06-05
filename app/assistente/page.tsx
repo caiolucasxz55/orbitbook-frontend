@@ -17,7 +17,6 @@ import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { destinations } from "@/data/destinations"
 import type { ChatMessage } from "@/types"
 
 const quickSuggestions = [
@@ -28,97 +27,10 @@ const quickSuggestions = [
   "Me fale sobre a missão para Marte",
 ]
 
-const aiResponses: Record<string, { content: string; suggestions?: string[] }> = {
-  iniciantes: {
-    content: `Para sua primeira experiência espacial, recomendo o **Voo Suborbital Aurora**! 🚀
-
-É perfeito para iniciantes porque:
-• Apenas 2 dias de treinamento
-• Requisitos físicos acessíveis
-• 4 minutos de microgravidade
-• Vista incrível da curvatura da Terra
-• Preço a partir de $450.000
-
-O treinamento é completo e a equipe da Stellar Dynamics é reconhecida pela excelência no atendimento a viajantes de primeira viagem.`,
-    suggestions: ["Ver detalhes do voo", "Quais são os requisitos?", "Posso parcelar?"],
-  },
-  lua: {
-    content: `Para ver a Lua de perto, temos o **Circuito Lunar Artemis**! 🌙
-
-Esta é a experiência mais exclusiva que oferecemos:
-• 8 dias de missão
-• Passagem a apenas 100km da superfície lunar
-• Vista do lado oculto da Lua
-• Máximo 3 passageiros por viagem
-• Inclui chef pessoal e médico a bordo
-
-O investimento é de $75 milhões, mas a experiência é verdadeiramente única na vida - você estará mais longe da Terra do que qualquer turista já esteve!`,
-    suggestions: ["Ver calendário de missões", "Quais os requisitos?", "Formas de pagamento"],
-  },
-  suborbital: {
-    content: `Os voos suborbitais são nossa opção mais acessível! 💫
-
-Temos duas opções disponíveis:
-
-**1. Voo Suborbital Aurora** - $450.000
-• 90 minutos de experiência
-• 4 minutos em microgravidade
-• Próxima data: 15 de julho de 2026
-
-**2. Eclipse Solar Orbital** - $650.000
-• Voo especial durante eclipse solar
-• 6 minutos de eclipse visto do espaço
-• Próxima data: 12 de agosto de 2027
-
-Ambos incluem treinamento completo, certificado de astronauta e hospedagem no spaceport!`,
-    suggestions: ["Comparar as duas opções", "Como funciona o treinamento?", "Quero reservar"],
-  },
-  requisitos: {
-    content: `Os requisitos variam por tipo de missão. Aqui estão os básicos:
-
-**Voos Suborbitais:**
-• Idade: 18+ anos
-• Altura: 1.52m - 1.93m
-• Peso: até 100kg
-• Atestado médico aprovado
-• 2 dias de treinamento
-
-**Estação Orbital (LEO):**
-• Idade: 21+ anos
-• Excelente condição física
-• 14 dias de treinamento intensivo
-
-**Missões Lunares/Marte:**
-• Avaliação médica e psicológica rigorosa
-• 30 dias a 1 ano de treinamento
-• Experiência prévia recomendada
-
-Quer saber os requisitos específicos de algum destino?`,
-    suggestions: ["Requisitos do voo suborbital", "Posso fazer se tenho problema cardíaco?", "Como é o treinamento?"],
-  },
-  marte: {
-    content: `A **Expedição Marte Pioneer** é a missão mais ambiciosa da história do turismo espacial! 🔴
-
-Esta não é apenas uma viagem - é uma oportunidade de fazer história:
-• Duração: 2 anos completos
-• Equipe de 12 pioneiros
-• Construção da base Mars Alpha
-• Exploração da superfície marciana
-• Pesquisas científicas históricas
-
-**Investimento:** $250 milhões
-
-**Requisitos especiais:**
-• Idade: 25-50 anos
-• Habilidades técnicas específicas
-• 1 ano de treinamento
-• Compromisso mínimo de 2 anos
-
-Próxima janela de lançamento: Novembro de 2028`,
-    suggestions: ["Quem pode se candidatar?", "Como funciona a seleção?", "Benefícios para pioneiros"],
-  },
-  default: {
-    content: `Olá! 👋 Sou o assistente de IA do OrbitBook, especializado em ajudar você a encontrar a experiência espacial perfeita!
+const welcomeMessage: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content: `Olá! 👋 Sou ARIA, a assistente de IA do OrbitBook, especializada em ajudar você a encontrar a experiência espacial perfeita!
 
 Posso ajudar com:
 • Recomendações personalizadas de destinos
@@ -128,42 +40,12 @@ Posso ajudar com:
 • Processo de reserva e pagamento
 
 O que você gostaria de saber sobre turismo espacial?`,
-    suggestions: ["Qual destino combina comigo?", "Opções para iniciantes", "Ver todos os destinos"],
-  },
-}
-
-function getAIResponse(message: string): { content: string; suggestions?: string[] } {
-  const lowerMessage = message.toLowerCase()
-  
-  if (lowerMessage.includes("iniciante") || lowerMessage.includes("primeira vez") || lowerMessage.includes("nunca foi")) {
-    return aiResponses.iniciantes
-  }
-  if (lowerMessage.includes("lua") || lowerMessage.includes("lunar")) {
-    return aiResponses.lua
-  }
-  if (lowerMessage.includes("suborbital") || lowerMessage.includes("quanto custa") || lowerMessage.includes("preço")) {
-    return aiResponses.suborbital
-  }
-  if (lowerMessage.includes("requisito") || lowerMessage.includes("físico") || lowerMessage.includes("preciso")) {
-    return aiResponses.requisitos
-  }
-  if (lowerMessage.includes("marte") || lowerMessage.includes("mars")) {
-    return aiResponses.marte
-  }
-  
-  return aiResponses.default
+  timestamp: new Date().toISOString(),
+  suggestions: ["Qual destino combina comigo?", "Opções para iniciantes", "Ver todos os destinos"],
 }
 
 export default function AssistentePage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: aiResponses.default.content,
-      timestamp: new Date().toISOString(),
-      suggestions: aiResponses.default.suggestions,
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -176,33 +58,58 @@ export default function AssistentePage() {
   }, [messages])
 
   const sendMessage = async (content: string) => {
-    if (!content.trim()) return
+    if (!content.trim() || isTyping) return
 
-    // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       content: content.trim(),
       timestamp: new Date().toISOString(),
     }
-    setMessages((prev) => [...prev, userMessage])
+
+    const updatedMessages = [...messages, userMessage]
+    setMessages(updatedMessages)
     setInput("")
     setIsTyping(true)
 
-    // Simulate AI thinking
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000))
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      })
 
-    // Get AI response
-    const response = getAIResponse(content)
-    const aiMessage: ChatMessage = {
-      id: `ai-${Date.now()}`,
-      role: "assistant",
-      content: response.content,
-      timestamp: new Date().toISOString(),
-      suggestions: response.suggestions,
+      if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
+
+      const data = await response.json()
+
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: "assistant",
+        content: data.content,
+        timestamp: new Date().toISOString(),
+        suggestions: data.suggestions,
+      }
+
+      setMessages((prev) => [...prev, aiMessage])
+    } catch (error) {
+      console.error("Chat error:", error)
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "Desculpe, tive um problema de conexão. Verifique sua conexão e tente novamente! 🚀",
+        timestamp: new Date().toISOString(),
+        suggestions: ["Tentar novamente", "Ver destinos disponíveis", "Quais são os requisitos?"],
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsTyping(false)
     }
-    setMessages((prev) => [...prev, aiMessage])
-    setIsTyping(false)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -215,15 +122,45 @@ export default function AssistentePage() {
   }
 
   const resetChat = () => {
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content: aiResponses.default.content,
-        timestamp: new Date().toISOString(),
-        suggestions: aiResponses.default.suggestions,
-      },
-    ])
+    setMessages([{ ...welcomeMessage, timestamp: new Date().toISOString() }])
+  }
+
+  // Renderiza o conteúdo da mensagem respeitando markdown simples
+  const renderMessageContent = (content: string) => {
+    return content.split("\n").map((line, i) => {
+      if (!line.trim()) return null
+
+      // Linha com **negrito**
+      if (line.includes("**")) {
+        const parts = line.split(/(\*\*[^*]+\*\*)/)
+        return (
+          <p key={i} className="mb-2 last:mb-0">
+            {parts.map((part, j) =>
+              part.startsWith("**") && part.endsWith("**") ? (
+                <strong key={j}>{part.slice(2, -2)}</strong>
+              ) : (
+                part
+              )
+            )}
+          </p>
+        )
+      }
+
+      // Bullet point
+      if (line.startsWith("•") || line.startsWith("-")) {
+        return (
+          <p key={i} className="mb-1 last:mb-0 ml-2">
+            {line}
+          </p>
+        )
+      }
+
+      return (
+        <p key={i} className="mb-2 last:mb-0">
+          {line}
+        </p>
+      )
+    })
   }
 
   return (
@@ -241,7 +178,7 @@ export default function AssistentePage() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
               <Sparkles className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">Assistente OrbitBook</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">ARIA — Assistente OrbitBook</h1>
             <p className="text-muted-foreground">
               Tire suas dúvidas e encontre a experiência espacial perfeita
             </p>
@@ -277,9 +214,7 @@ export default function AssistentePage() {
                       </div>
 
                       {/* Content */}
-                      <div
-                        className={`flex-1 ${message.role === "user" ? "text-right" : ""}`}
-                      >
+                      <div className={`flex-1 ${message.role === "user" ? "text-right" : ""}`}>
                         <div
                           className={`inline-block max-w-[85%] rounded-2xl px-4 py-3 text-left ${
                             message.role === "user"
@@ -288,17 +223,7 @@ export default function AssistentePage() {
                           }`}
                         >
                           <div className="prose prose-sm prose-invert max-w-none">
-                            {message.content.split("\n").map((line, i) => (
-                              <p key={i} className="mb-2 last:mb-0">
-                                {line.startsWith("**") ? (
-                                  <strong>{line.replace(/\*\*/g, "")}</strong>
-                                ) : line.startsWith("•") ? (
-                                  <span className="block ml-2">{line}</span>
-                                ) : (
-                                  line
-                                )}
-                              </p>
-                            ))}
+                            {renderMessageContent(message.content)}
                           </div>
                         </div>
 
@@ -317,6 +242,7 @@ export default function AssistentePage() {
                                 size="sm"
                                 onClick={() => handleSuggestionClick(suggestion)}
                                 className="text-xs"
+                                disabled={isTyping}
                               >
                                 {suggestion}
                               </Button>
@@ -341,8 +267,14 @@ export default function AssistentePage() {
                     <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3">
                       <div className="flex gap-1">
                         <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
-                        <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                        <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                        <span
+                          className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        />
+                        <span
+                          className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        />
                       </div>
                     </div>
                   </motion.div>
@@ -350,7 +282,7 @@ export default function AssistentePage() {
               </div>
             </ScrollArea>
 
-            {/* Quick Suggestions (shown when chat is fresh) */}
+            {/* Quick Suggestions — só aparecem na tela inicial */}
             {messages.length === 1 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -388,7 +320,7 @@ export default function AssistentePage() {
                 <Button type="submit" disabled={!input.trim() || isTyping}>
                   <Send className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="outline" onClick={resetChat}>
+                <Button type="button" variant="outline" onClick={resetChat} disabled={isTyping}>
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </form>
