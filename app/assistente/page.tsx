@@ -17,6 +17,8 @@ import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAuth } from "@/contexts/auth-context"
+import { api } from "@/lib/api"
 import type { ChatMessage } from "@/types"
 
 const quickSuggestions = [
@@ -45,6 +47,7 @@ O que você gostaria de saber sobre turismo espacial?`,
 }
 
 export default function AssistentePage() {
+  const { openAuthModal } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
@@ -73,40 +76,54 @@ export default function AssistentePage() {
     setIsTyping(true)
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: updatedMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
-      })
+      const data = await api.ai.chat(
+        updatedMessages.map((m) => ({ role: m.role, content: m.content }))
+      )
 
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          role: "assistant",
+          content: data.content,
+          timestamp: new Date().toISOString(),
+          suggestions: data.suggestions,
+        },
+      ])
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : ""
+      const isAuthError =
+        msg.includes("401") ||
+        msg.toLowerCase().includes("token") ||
+        msg.toLowerCase().includes("authenticated")
 
-      const data = await response.json()
-
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        role: "assistant",
-        content: data.content,
-        timestamp: new Date().toISOString(),
-        suggestions: data.suggestions,
+      if (isAuthError) {
+        openAuthModal()
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "Para conversar com a ARIA você precisa estar logado. Faça login ou crie sua conta! 🚀",
+            timestamp: new Date().toISOString(),
+            suggestions: ["Criar conta", "Fazer login"],
+          },
+        ])
+      } else {
+        console.error("Chat error:", error)
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "Desculpe, tive um problema de conexão. Verifique sua conexão e tente novamente! 🚀",
+            timestamp: new Date().toISOString(),
+            suggestions: ["Tentar novamente", "Ver destinos disponíveis", "Quais são os requisitos?"],
+          },
+        ])
       }
-
-      setMessages((prev) => [...prev, aiMessage])
-    } catch (error) {
-      console.error("Chat error:", error)
-      const errorMessage: ChatMessage = {
-        id: `error-${Date.now()}`,
-        role: "assistant",
-        content: "Desculpe, tive um problema de conexão. Verifique sua conexão e tente novamente! 🚀",
-        timestamp: new Date().toISOString(),
-        suggestions: ["Tentar novamente", "Ver destinos disponíveis", "Quais são os requisitos?"],
-      }
-      setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsTyping(false)
     }

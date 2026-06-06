@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Search, SlidersHorizontal, X, Grid3X3, List } from "lucide-react"
+import { Search, SlidersHorizontal, X } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { DestinationCard } from "@/components/destinations/destination-card"
@@ -25,11 +25,28 @@ import {
 } from "@/components/ui/sheet"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
-import { destinations, categories, priceRanges } from "@/data/destinations"
+import { api, apiDestinoToDestination } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import type { Destination } from "@/types"
+
+const categories = [
+  { id: "all", name: "Todos" },
+  { id: "suborbital", name: "Suborbital" },
+  { id: "leo", name: "Órbita Terrestre" },
+  { id: "lunar", name: "Lunar" },
+  { id: "mars", name: "Marte" },
+]
+
+const priceRanges = [
+  { id: "all", name: "Todos os preços", min: 0, max: Infinity },
+  { id: "entry", name: "Até $1M", min: 0, max: 1000000 },
+  { id: "mid", name: "$1M - $50M", min: 1000000, max: 50000000 },
+  { id: "high", name: "$50M - $200M", min: 50000000, max: 200000000 },
+  { id: "ultra", name: "Acima de $200M", min: 200000000, max: Infinity },
+]
 
 const riskLevels = ["Baixo", "Moderado", "Alto", "Extremo"]
+
 const sortOptions = [
   { value: "popularity", label: "Popularidade" },
   { value: "price-asc", label: "Menor Preço" },
@@ -39,6 +56,8 @@ const sortOptions = [
 ]
 
 export default function ExplorarPage() {
+  const [allDestinations, setAllDestinations] = useState<Destination[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedRisks, setSelectedRisks] = useState<string[]>([])
@@ -46,9 +65,16 @@ export default function ExplorarPage() {
   const [sortBy, setSortBy] = useState("popularity")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
+  useEffect(() => {
+    api.destinos
+      .list()
+      .then((dests) => setAllDestinations(dests.map(apiDestinoToDestination)))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
   const filteredDestinations = useMemo(() => {
-    let filtered = destinations.filter((destination) => {
-      // Search query
+    let filtered = allDestinations.filter((destination) => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         if (
@@ -60,19 +86,16 @@ export default function ExplorarPage() {
         }
       }
 
-      // Category filter
       if (selectedCategory !== "all" && destination.category !== selectedCategory) {
         return false
       }
 
-      // Risk filter
       if (selectedRisks.length > 0 && !selectedRisks.includes(destination.riskLevel)) {
         return false
       }
 
-      // Price filter
       if (selectedPriceRange !== "all") {
-        const range = priceRanges.find(r => r.id === selectedPriceRange)
+        const range = priceRanges.find((r) => r.id === selectedPriceRange)
         if (range && (destination.price < range.min || destination.price > range.max)) {
           return false
         }
@@ -81,7 +104,6 @@ export default function ExplorarPage() {
       return true
     })
 
-    // Sort
     switch (sortBy) {
       case "price-asc":
         filtered.sort((a, b) => a.price - b.price)
@@ -100,11 +122,11 @@ export default function ExplorarPage() {
     }
 
     return filtered
-  }, [searchQuery, selectedCategory, selectedRisks, selectedPriceRange, sortBy])
+  }, [allDestinations, searchQuery, selectedCategory, selectedRisks, selectedPriceRange, sortBy])
 
-  const activeFiltersCount = 
-    (selectedCategory !== "all" ? 1 : 0) + 
-    selectedRisks.length + 
+  const activeFiltersCount =
+    (selectedCategory !== "all" ? 1 : 0) +
+    selectedRisks.length +
     (selectedPriceRange !== "all" ? 1 : 0)
 
   const clearFilters = () => {
@@ -126,7 +148,6 @@ export default function ExplorarPage() {
 
       <div className="pt-24 pb-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -137,7 +158,9 @@ export default function ExplorarPage() {
               Catálogo de Experiências
             </h1>
             <p className="text-muted-foreground">
-              {destinations.length} experiências disponíveis em {categories.length - 1} categorias
+              {loading
+                ? "Carregando destinos..."
+                : `${allDestinations.length} experiências disponíveis`}
             </p>
           </motion.div>
 
@@ -171,7 +194,6 @@ export default function ExplorarPage() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="flex flex-col sm:flex-row gap-3 mb-6"
           >
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -182,7 +204,6 @@ export default function ExplorarPage() {
               />
             </div>
 
-            {/* Price Range Select */}
             <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
               <SelectTrigger className="w-full sm:w-44 bg-card">
                 <SelectValue placeholder="Preço" />
@@ -196,7 +217,6 @@ export default function ExplorarPage() {
               </SelectContent>
             </Select>
 
-            {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-full sm:w-44 bg-card">
                 <SelectValue placeholder="Ordenar por" />
@@ -210,7 +230,6 @@ export default function ExplorarPage() {
               </SelectContent>
             </Select>
 
-            {/* More Filters Button */}
             <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" className="gap-2">
@@ -228,7 +247,6 @@ export default function ExplorarPage() {
                   <SheetTitle>Filtros Avançados</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-6">
-                  {/* Risk Level */}
                   <div>
                     <h3 className="font-medium mb-3">Nível de Risco</h3>
                     <div className="space-y-2">
@@ -239,13 +257,14 @@ export default function ExplorarPage() {
                             checked={selectedRisks.includes(risk)}
                             onCheckedChange={() => toggleRisk(risk)}
                           />
-                          <Label htmlFor={risk} className="cursor-pointer text-sm">{risk}</Label>
+                          <Label htmlFor={risk} className="cursor-pointer text-sm">
+                            {risk}
+                          </Label>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Clear Filters */}
                   {activeFiltersCount > 0 && (
                     <Button variant="outline" onClick={clearFilters} className="w-full">
                       Limpar Todos os Filtros
@@ -295,10 +314,7 @@ export default function ExplorarPage() {
                   <X className="h-3 w-3" />
                 </Badge>
               ))}
-              <button 
-                onClick={clearFilters}
-                className="text-sm text-primary hover:underline"
-              >
+              <button onClick={clearFilters} className="text-sm text-primary hover:underline">
                 Limpar todos
               </button>
             </motion.div>
@@ -313,14 +329,16 @@ export default function ExplorarPage() {
           </div>
 
           {/* Grid */}
-          {filteredDestinations.length > 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-card rounded-xl border border-border animate-pulse h-72" />
+              ))}
+            </div>
+          ) : filteredDestinations.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {filteredDestinations.map((destination, index) => (
-                <DestinationCard
-                  key={destination.id}
-                  destination={destination}
-                  index={index}
-                />
+                <DestinationCard key={destination.id} destination={destination} index={index} />
               ))}
             </div>
           ) : (

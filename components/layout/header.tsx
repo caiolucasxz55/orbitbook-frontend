@@ -3,10 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { Rocket, Menu, X, User } from "lucide-react"
+import { Rocket, Menu, X, User, LogOut } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
 
 const navLinks = [
   { href: "/", label: "Início" },
@@ -18,6 +19,7 @@ const navLinks = [
 export function Header() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { user, logout, openAuthModal } = useAuth()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -26,9 +28,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <Rocket className="h-6 w-6 text-primary" />
-            <span className="text-lg font-semibold tracking-tight">
-              OrbitBook
-            </span>
+            <span className="text-lg font-semibold tracking-tight">OrbitBook</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -61,17 +61,32 @@ export function Header() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="gap-2 h-8">
-                <User className="h-4 w-4" />
-                Conta
-              </Button>
-            </Link>
-            <Link href="/explorar">
-              <Button size="sm" className="h-8">
-                Reservar
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="ghost" size="sm" className="gap-2 h-8">
+                    <User className="h-4 w-4" />
+                    {user.nome.split(" ")[0]}
+                  </Button>
+                </Link>
+                <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={logout}>
+                  <LogOut className="h-4 w-4" />
+                  Sair
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" className="gap-2 h-8" onClick={openAuthModal}>
+                  <User className="h-4 w-4" />
+                  Entrar
+                </Button>
+                <Link href="/explorar">
+                  <Button size="sm" className="h-8">
+                    Reservar
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -79,11 +94,7 @@ export function Header() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
           >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -116,17 +127,42 @@ export function Header() {
               )
             })}
             <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2">
-              <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
-                  <User className="h-4 w-4" />
-                  Minha Conta
-                </Button>
-              </Link>
-              <Link href="/explorar" onClick={() => setMobileMenuOpen(false)}>
-                <Button size="sm" className="w-full">
-                  Reservar Agora
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+                      <User className="h-4 w-4" />
+                      {user.nome}
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={() => { logout(); setMobileMenuOpen(false) }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start gap-2"
+                    onClick={() => { openAuthModal(); setMobileMenuOpen(false) }}
+                  >
+                    <User className="h-4 w-4" />
+                    Entrar / Criar Conta
+                  </Button>
+                  <Link href="/explorar" onClick={() => setMobileMenuOpen(false)}>
+                    <Button size="sm" className="w-full">
+                      Reservar Agora
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         </motion.div>

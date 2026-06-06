@@ -1,18 +1,18 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import Image from "next/image"
 import Link from "next/link"
 import {
   Rocket,
   Calendar,
-  MapPin,
   Clock,
   Award,
   Star,
   ChevronRight,
-  Settings,
   LogOut,
+  Loader2,
+  User,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -20,54 +20,192 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { mockUser, orbitPassTiers } from "@/data/user"
+import { useAuth } from "@/contexts/auth-context"
+import { api, type ApiReserva, type ApiDestino } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const statusColors: Record<string, string> = {
-  confirmed: "bg-green-500/20 text-green-400 border-green-500/30",
-  pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
+  PENDENTE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  CONFIRMADO: "bg-green-500/20 text-green-400 border-green-500/30",
+  EM_MISSAO: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  CONCLUIDO: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  CANCELADO: "bg-red-500/20 text-red-400 border-red-500/30",
 }
 
 const statusLabels: Record<string, string> = {
-  confirmed: "Confirmada",
-  pending: "Pendente",
-  completed: "Concluída",
-  cancelled: "Cancelada",
+  PENDENTE: "Pendente",
+  CONFIRMADO: "Confirmada",
+  EM_MISSAO: "Em Missão",
+  CONCLUIDO: "Concluída",
+  CANCELADO: "Cancelada",
 }
 
-const tierColors: Record<string, string> = {
-  explorer: "from-blue-500 to-cyan-500",
-  pioneer: "from-purple-500 to-pink-500",
-  elite: "from-amber-500 to-orange-500",
+const planColors: Record<string, string> = {
+  EXPLORER: "from-blue-500 to-cyan-500",
+  PIONEER: "from-purple-500 to-pink-500",
+  ASTRONAUT: "from-amber-500 to-orange-500",
 }
+
+const planBenefits: Record<string, string[]> = {
+  EXPLORER: ["Acesso antecipado a novos destinos", "5% de desconto em reservas", "Suporte prioritário"],
+  PIONEER: ["Acesso antecipado a novos destinos", "10% de desconto em reservas", "Suporte VIP", "Sala de espera exclusiva"],
+  ASTRONAUT: ["Acesso antecipado a novos destinos", "15% de desconto em reservas", "Concierge dedicado", "Upgrades gratuitos", "Eventos exclusivos"],
+}
+
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+  }).format(price)
+
+const formatDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
 
 export default function DashboardPage() {
-  const user = mockUser
-  const currentTier = user.orbitPassTier ? orbitPassTiers[user.orbitPassTier] : null
+  const { user, logout, openAuthModal, isLoading: authLoading } = useAuth()
+  const [reservas, setReservas] = useState<ApiReserva[]>([])
+  const [destinos, setDestinos] = useState<Map<number, ApiDestino>>(new Map())
+  const [loadingData, setLoadingData] = useState(false)
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    }).format(price)
+  useEffect(() => {
+    if (!user) return
+    setLoadingData(true)
+
+    Promise.all([api.reservas.list(), api.destinos.list()])
+      .then(([reservasList, destinosList]) => {
+        setReservas(reservasList)
+        setDestinos(new Map(destinosList.map((d) => [d.id, d])))
+      })
+      .catch(() => {})
+      .finally(() => setLoadingData(false))
+  }, [user])
+
+  if (authLoading) {
+    return (
+      <main className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center h-[80vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+        <Footer />
+      </main>
+    )
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
+  if (!user) {
+    return (
+      <main className="min-h-screen">
+        <Header />
+        <div className="flex flex-col items-center justify-center h-[80vh] gap-6 text-center px-4">
+          <User className="h-16 w-16 text-muted-foreground opacity-40" />
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Acesse sua conta</h1>
+            <p className="text-muted-foreground">Faça login para ver seu dashboard e reservas.</p>
+          </div>
+          <Button onClick={openAuthModal}>Entrar / Criar Conta</Button>
+        </div>
+        <Footer />
+      </main>
+    )
   }
 
-  const daysUntilLaunch = (dateStr: string) => {
-    const launch = new Date(dateStr)
-    const today = new Date()
-    const diff = Math.ceil((launch.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    return diff
+  const upcoming = reservas.filter((r) =>
+    ["PENDENTE", "CONFIRMADO", "EM_MISSAO"].includes(r.status)
+  )
+  const past = reservas.filter((r) => ["CONCLUIDO", "CANCELADO"].includes(r.status))
+  const completedCount = reservas.filter((r) => r.status === "CONCLUIDO").length
+  const hasPlan = user.plano !== "NENHUM"
+
+  function BookingCard({ reserva, compact = false }: { reserva: ApiReserva; compact?: boolean }) {
+    const destino = destinos.get(reserva.destino_id)
+    const missionCode = `OBK-${reserva.id.toString().padStart(6, "0")}`
+
+    if (compact) {
+      return (
+        <div className="glass rounded-xl p-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Rocket className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge
+                  variant="outline"
+                  className={cn("text-xs", statusColors[reserva.status])}
+                >
+                  {statusLabels[reserva.status]}
+                </Badge>
+              </div>
+              <h4 className="font-semibold truncate">
+                {destino?.nome || `Destino #${reserva.destino_id}`}
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(reserva.criado_em)} • {reserva.num_passageiros} passageiro
+                {reserva.num_passageiros > 1 ? "s" : ""}
+              </p>
+            </div>
+            <div className="text-right hidden sm:block">
+              <div className="font-semibold">{formatPrice(reserva.valor_total)}</div>
+              <div className="text-xs text-muted-foreground font-mono">{missionCode}</div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="glass rounded-2xl p-6 gradient-border">
+        <div className="flex flex-col sm:flex-row gap-6">
+          <div className="w-full sm:w-48 h-32 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Rocket className="h-12 w-12 text-primary/50" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <Badge
+                  variant="outline"
+                  className={cn("mb-2", statusColors[reserva.status])}
+                >
+                  {statusLabels[reserva.status]}
+                </Badge>
+                <h3 className="text-lg font-semibold">
+                  {destino?.nome || `Destino #${reserva.destino_id}`}
+                </h3>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                {formatDate(reserva.criado_em)}
+              </div>
+              {destino?.duracao && (
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {destino.duracao}h
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <span className="text-muted-foreground">Código da missão: </span>
+                <span className="font-mono font-semibold">{missionCode}</span>
+              </div>
+              <Link href={`/destino/${reserva.destino_id}`}>
+                <Button variant="ghost" size="sm" className="gap-1">
+                  Ver destino
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -84,22 +222,15 @@ export default function DashboardPage() {
             className="glass rounded-2xl p-6 sm:p-8 mb-8"
           >
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              {/* Avatar */}
               <div className="relative">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden">
-                  <Image
-                    src={user.avatar}
-                    alt={user.name}
-                    width={96}
-                    height={96}
-                    className="object-cover"
-                  />
+                <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <User className="h-12 w-12 text-primary/60" />
                 </div>
-                {currentTier && (
+                {hasPlan && (
                   <div
                     className={cn(
                       "absolute -bottom-2 -right-2 w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center",
-                      tierColors[user.orbitPassTier!]
+                      planColors[user.plano]
                     )}
                   >
                     <Award className="h-4 w-4 text-white" />
@@ -107,144 +238,72 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Info */}
               <div className="flex-1">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold">{user.name}</h1>
-                  {currentTier && (
+                  <h1 className="text-2xl sm:text-3xl font-bold">{user.nome}</h1>
+                  {hasPlan && (
                     <Badge
                       variant="outline"
                       className={cn(
                         "bg-gradient-to-r text-white border-0 w-fit",
-                        tierColors[user.orbitPassTier!]
+                        planColors[user.plano]
                       )}
                     >
-                      OrbitPass {currentTier.name}
+                      OrbitPass {user.plano.charAt(0) + user.plano.slice(1).toLowerCase()}
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground mb-4">
-                  Membro desde {formatDate(user.memberSince)}
-                </p>
-
-                {/* Stats */}
+                <p className="text-muted-foreground mb-4">{user.email}</p>
                 <div className="flex flex-wrap gap-6">
                   <div>
-                    <div className="text-2xl font-bold text-gradient">{user.totalMissions}</div>
-                    <div className="text-sm text-muted-foreground">Missões</div>
+                    <div className="text-2xl font-bold text-gradient">{completedCount}</div>
+                    <div className="text-sm text-muted-foreground">Missões Concluídas</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gradient">{user.totalDistance}</div>
-                    <div className="text-sm text-muted-foreground">Distância Total</div>
+                    <div className="text-2xl font-bold text-gradient">{reservas.length}</div>
+                    <div className="text-sm text-muted-foreground">Total de Reservas</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gradient">
-                      {user.upcomingBookings.length}
-                    </div>
+                    <div className="text-2xl font-bold text-gradient">{upcoming.length}</div>
                     <div className="text-sm text-muted-foreground">Próximas Viagens</div>
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon">
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button variant="outline" size="icon" onClick={logout} title="Sair">
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </motion.div>
 
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Upcoming Bookings */}
-              {user.upcomingBookings.length > 0 && (
+              {/* Upcoming */}
+              {upcoming.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1 }}
                 >
                   <h2 className="text-xl font-bold mb-4">Próximas Missões</h2>
-                  <div className="space-y-4">
-                    {user.upcomingBookings.map((booking) => {
-                      const days = daysUntilLaunch(booking.departureDate)
-                      return (
-                        <div
-                          key={booking.id}
-                          className="glass rounded-2xl p-6 gradient-border"
-                        >
-                          <div className="flex flex-col sm:flex-row gap-6">
-                            {/* Image */}
-                            <div className="relative w-full sm:w-48 h-32 rounded-xl overflow-hidden shrink-0">
-                              <Image
-                                src={booking.destination.heroImage}
-                                alt={booking.destination.name}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <Badge
-                                    variant="outline"
-                                    className={cn("mb-2", statusColors[booking.status])}
-                                  >
-                                    {statusLabels[booking.status]}
-                                  </Badge>
-                                  <h3 className="text-lg font-semibold">
-                                    {booking.destination.name}
-                                  </h3>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold text-primary">{days}</div>
-                                  <div className="text-xs text-muted-foreground">dias restantes</div>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="h-4 w-4" />
-                                  {formatDate(booking.departureDate)}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-4 w-4" />
-                                  {booking.destination.launchSite}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
-                                  {booking.destination.duration}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between">
-                                <div className="text-sm">
-                                  <span className="text-muted-foreground">Código da missão: </span>
-                                  <span className="font-mono font-semibold">{booking.missionCode}</span>
-                                </div>
-                                <Link href={`/destino/${booking.destination.slug}`}>
-                                  <Button variant="ghost" size="sm" className="gap-1">
-                                    Ver detalhes
-                                    <ChevronRight className="h-4 w-4" />
-                                  </Button>
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  {loadingData ? (
+                    <div className="space-y-4">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="h-40 bg-card rounded-2xl animate-pulse" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {upcoming.map((r) => (
+                        <BookingCard key={r.id} reserva={r} />
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
 
-              {/* Past Bookings */}
+              {/* All Bookings Tabs */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -252,83 +311,43 @@ export default function DashboardPage() {
               >
                 <Tabs defaultValue="past">
                   <TabsList className="bg-card/50 mb-4">
-                    <TabsTrigger value="past">Missões Anteriores</TabsTrigger>
-                    <TabsTrigger value="all">Todas as Reservas</TabsTrigger>
+                    <TabsTrigger value="past">
+                      Missões Anteriores {past.length > 0 && `(${past.length})`}
+                    </TabsTrigger>
+                    <TabsTrigger value="all">
+                      Todas as Reservas {reservas.length > 0 && `(${reservas.length})`}
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="past" className="space-y-4">
-                    {user.pastBookings.map((booking) => (
-                      <div key={booking.id} className="glass rounded-xl p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0">
-                            <Image
-                              src={booking.destination.heroImage}
-                              alt={booking.destination.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge
-                                variant="outline"
-                                className={cn("text-xs", statusColors[booking.status])}
-                              >
-                                {statusLabels[booking.status]}
-                              </Badge>
-                            </div>
-                            <h4 className="font-semibold truncate">
-                              {booking.destination.name}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(booking.departureDate)} • {booking.passengers} passageiro{booking.passengers > 1 ? "s" : ""}
-                            </p>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <div className="font-semibold">{formatPrice(booking.totalPrice)}</div>
-                            <div className="text-xs text-muted-foreground font-mono">
-                              {booking.missionCode}
-                            </div>
-                          </div>
-                        </div>
+                    {loadingData ? (
+                      <div className="h-32 bg-card rounded-xl animate-pulse" />
+                    ) : past.length > 0 ? (
+                      past.map((r) => <BookingCard key={r.id} reserva={r} compact />)
+                    ) : (
+                      <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+                        <Rocket className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>Nenhuma missão anterior ainda.</p>
                       </div>
-                    ))}
+                    )}
                   </TabsContent>
 
                   <TabsContent value="all" className="space-y-4">
-                    {[...user.upcomingBookings, ...user.pastBookings].map((booking) => (
-                      <div key={booking.id} className="glass rounded-xl p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative w-20 h-20 rounded-lg overflow-hidden shrink-0">
-                            <Image
-                              src={booking.destination.heroImage}
-                              alt={booking.destination.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge
-                                variant="outline"
-                                className={cn("text-xs", statusColors[booking.status])}
-                              >
-                                {statusLabels[booking.status]}
-                              </Badge>
-                            </div>
-                            <h4 className="font-semibold truncate">
-                              {booking.destination.name}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(booking.departureDate)}
-                            </p>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <div className="font-semibold">{formatPrice(booking.totalPrice)}</div>
-                          </div>
-                        </div>
+                    {loadingData ? (
+                      <div className="h-32 bg-card rounded-xl animate-pulse" />
+                    ) : reservas.length > 0 ? (
+                      reservas.map((r) => <BookingCard key={r.id} reserva={r} compact />)
+                    ) : (
+                      <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+                        <Rocket className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>Nenhuma reserva encontrada.</p>
+                        <Link href="/explorar">
+                          <Button variant="outline" size="sm" className="mt-4">
+                            Explorar Destinos
+                          </Button>
+                        </Link>
                       </div>
-                    ))}
+                    )}
                   </TabsContent>
                 </Tabs>
               </motion.div>
@@ -337,28 +356,28 @@ export default function DashboardPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* OrbitPass Card */}
-              {currentTier && (
+              {hasPlan && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.3 }}
                   className={cn(
                     "rounded-2xl p-6 text-white bg-gradient-to-br",
-                    tierColors[user.orbitPassTier!]
+                    planColors[user.plano]
                   )}
                 >
                   <div className="flex items-center justify-between mb-6">
                     <Rocket className="h-8 w-8" />
                     <span className="text-sm opacity-80">OrbitPass</span>
                   </div>
-                  <h3 className="text-2xl font-bold mb-1">{currentTier.name}</h3>
-                  <p className="text-sm opacity-80 mb-6">
-                    Renovação automática: ${currentTier.price}/ano
-                  </p>
+                  <h3 className="text-2xl font-bold mb-1">
+                    {user.plano.charAt(0) + user.plano.slice(1).toLowerCase()}
+                  </h3>
+                  <p className="text-sm opacity-80 mb-6">Plano ativo</p>
                   <Separator className="bg-white/20 mb-4" />
                   <ul className="space-y-2">
-                    {currentTier.benefits.slice(0, 4).map((benefit, index) => (
-                      <li key={index} className="flex items-center gap-2 text-sm">
+                    {(planBenefits[user.plano] || []).map((benefit, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm">
                         <Star className="h-3 w-3" />
                         {benefit}
                       </li>

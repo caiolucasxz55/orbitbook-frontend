@@ -1,9 +1,9 @@
 "use client"
 
-import { use } from "react"
+import { use, useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   Star,
@@ -12,7 +12,6 @@ import {
   Users,
   AlertTriangle,
   Check,
-  X,
   ChevronLeft,
   Share2,
   Heart,
@@ -20,6 +19,7 @@ import {
   Calendar,
   Shield,
   Rocket,
+  Loader2,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -27,9 +27,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { destinations, reviews } from "@/data/destinations"
+import {
+  api,
+  apiDestinoToDestination,
+  type ApiAvaliacao,
+  type ApiDisponibilidade,
+} from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
-import type { Badge as BadgeType } from "@/types"
+import type { Destination, Badge as BadgeType } from "@/types"
 
 const badgeStyles: Record<BadgeType["type"], string> = {
   popular: "bg-primary/20 text-primary border-primary/30",
@@ -46,38 +52,92 @@ const riskColors: Record<string, string> = {
   Extremo: "text-red-400",
 }
 
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price)
+
+const formatDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+
 export default function DestinoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
-  const destination = destinations.find((d) => d.slug === slug)
+  const router = useRouter()
+  const { user, openAuthModal } = useAuth()
 
-  if (!destination) {
-    notFound()
+  const [destination, setDestination] = useState<Destination | null>(null)
+  const [reviews, setReviews] = useState<ApiAvaliacao[]>([])
+  const [disponibilidades, setDisponibilidades] = useState<ApiDisponibilidade[]>([])
+  const [loading, setLoading] = useState(true)
+  const [booking, setBooking] = useState(false)
+  const [bookingMsg, setBookingMsg] = useState("")
+
+  useEffect(() => {
+    const id = parseInt(slug)
+    if (isNaN(id)) { router.replace("/explorar"); return }
+
+    Promise.all([
+      api.destinos.get(id).then(apiDestinoToDestination),
+      api.avaliacoes.listByDestino(id).catch(() => [] as ApiAvaliacao[]),
+      api.destinos.disponibilidades(id).catch(() => [] as ApiDisponibilidade[]),
+    ])
+      .then(([dest, revs, disps]) => {
+        setDestination(dest)
+        setReviews(revs)
+        setDisponibilidades(disps)
+      })
+      .catch(() => router.replace("/explorar"))
+      .finally(() => setLoading(false))
+  }, [slug, router])
+
+  const nextDisponibilidade = disponibilidades.find((d) => d.vagas_disponiveis > 0)
+
+  async function handleReservar() {
+    if (!user) { openAuthModal(); return }
+    if (!destination) return
+
+    setBooking(true)
+    setBookingMsg("")
+    try {
+      await api.reservas.create({
+        destino_id: parseInt(destination.id),
+        disponibilidade_id: nextDisponibilidade?.id,
+        num_passageiros: 1,
+      })
+      setBookingMsg("Reserva criada com sucesso! Confira no seu dashboard.")
+    } catch (err: unknown) {
+      setBookingMsg(err instanceof Error ? err.message : "Erro ao criar reserva")
+    } finally {
+      setBooking(false)
+    }
   }
 
-  const destinationReviews = reviews.filter((r) => r.destinationId === destination.id)
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price)
+  if (loading) {
+    return (
+      <main className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center h-[80vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+        <Footer />
+      </main>
+    )
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("pt-BR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-  }
+  if (!destination) return null
 
   return (
     <main className="min-h-screen">
       <Header />
 
-      {/* Hero Image */}
+      {/* Hero */}
       <section className="relative h-[60vh] min-h-[500px]">
         <Image
           src={destination.heroImage}
@@ -89,7 +149,6 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
 
-        {/* Back button */}
         <div className="absolute top-24 left-4 sm:left-8 z-10">
           <Link href="/explorar">
             <Button variant="ghost" className="glass gap-2">
@@ -99,7 +158,6 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
           </Link>
         </div>
 
-        {/* Actions */}
         <div className="absolute top-24 right-4 sm:right-8 z-10 flex gap-2">
           <Button variant="ghost" size="icon" className="glass">
             <Share2 className="h-4 w-4" />
@@ -109,10 +167,8 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
           </Button>
         </div>
 
-        {/* Content */}
         <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8">
           <div className="mx-auto max-w-7xl">
-            {/* Badges */}
             <div className="flex flex-wrap gap-2 mb-4">
               {destination.badges.map((badge) => (
                 <Badge
@@ -129,32 +185,29 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
               {destination.name}
             </h1>
 
-            <p className="text-xl text-muted-foreground mb-6 max-w-2xl">
-              {destination.tagline}
-            </p>
+            <p className="text-xl text-muted-foreground mb-6 max-w-2xl">{destination.tagline}</p>
 
-            {/* Quick stats */}
             <div className="flex flex-wrap items-center gap-6 text-sm">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5 fill-chart-5 text-chart-5" />
-                <span className="font-semibold">{destination.rating}</span>
-                <span className="text-muted-foreground">
-                  ({destination.reviewCount} avaliações)
-                </span>
+                <span className="font-semibold">{destination.rating.toFixed(1)}</span>
+                <span className="text-muted-foreground">({destination.reviewCount} avaliações)</span>
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>{destination.duration}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>{destination.distance}</span>
-              </div>
+              {destination.duration !== "A definir" && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>{destination.duration}</span>
+                </div>
+              )}
+              {destination.distance && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>{destination.distance}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <AlertTriangle className={cn("h-4 w-4", riskColors[destination.riskLevel])} />
-                <span className={riskColors[destination.riskLevel]}>
-                  Risco {destination.riskLevel}
-                </span>
+                <span className={riskColors[destination.riskLevel]}>Risco {destination.riskLevel}</span>
               </div>
             </div>
           </div>
@@ -167,34 +220,6 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-12">
-              {/* Gallery */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <h2 className="text-2xl font-bold mb-6">Galeria</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {destination.gallery.map((image, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "relative rounded-xl overflow-hidden",
-                        index === 0 ? "col-span-2 row-span-2 aspect-square" : "aspect-video"
-                      )}
-                    >
-                      <Image
-                        src={image}
-                        alt={`${destination.name} - Imagem ${index + 1}`}
-                        fill
-                        className="object-cover hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* Tabs */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -203,178 +228,138 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                 <Tabs defaultValue="about" className="w-full">
                   <TabsList className="w-full justify-start bg-card/50 p-1 mb-8">
                     <TabsTrigger value="about">Sobre</TabsTrigger>
-                    <TabsTrigger value="specs">Especificações</TabsTrigger>
-                    <TabsTrigger value="requirements">Requisitos</TabsTrigger>
-                    <TabsTrigger value="reviews">Avaliações</TabsTrigger>
+                    {destination.technicalSpecs.length > 0 && (
+                      <TabsTrigger value="specs">Especificações</TabsTrigger>
+                    )}
+                    {destination.requirements.length > 0 && (
+                      <TabsTrigger value="requirements">Requisitos</TabsTrigger>
+                    )}
+                    <TabsTrigger value="reviews">
+                      Avaliações {reviews.length > 0 && `(${reviews.length})`}
+                    </TabsTrigger>
+                    {disponibilidades.length > 0 && (
+                      <TabsTrigger value="disponibilidades">Datas</TabsTrigger>
+                    )}
                   </TabsList>
 
                   <TabsContent value="about" className="space-y-8">
-                    {/* Description */}
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Descrição</h3>
-                      <div className="prose prose-invert max-w-none">
-                        {destination.longDescription.split("\n\n").map((paragraph, index) => (
-                          <p key={index} className="text-muted-foreground leading-relaxed mb-4">
-                            {paragraph}
-                          </p>
+                    {destination.description ? (
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">Descrição</h3>
+                        <p className="text-muted-foreground leading-relaxed">
+                          {destination.description}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">Descrição não disponível.</p>
+                    )}
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {destination.operator && (
+                        <div className="flex items-center gap-4 p-4 rounded-xl bg-card/50">
+                          <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                            <Rocket className="h-6 w-6 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-semibold">{destination.operator}</div>
+                            <div className="text-sm text-muted-foreground">Operadora</div>
+                          </div>
+                        </div>
+                      )}
+                      {destination.maxCapacity > 0 && (
+                        <div className="flex items-center gap-4 p-4 rounded-xl bg-card/50">
+                          <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                            <Users className="h-6 w-6 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-semibold">{destination.maxCapacity} passageiros</div>
+                            <div className="text-sm text-muted-foreground">Capacidade máxima</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {destination.technicalSpecs.length > 0 && (
+                    <TabsContent value="specs" className="space-y-4">
+                      <h3 className="text-xl font-semibold">Especificações Técnicas</h3>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        {destination.technicalSpecs.map((spec, i) => (
+                          <div
+                            key={i}
+                            className="flex justify-between items-center p-4 rounded-xl bg-card/50"
+                          >
+                            <span className="text-muted-foreground">{spec.label}</span>
+                            <span className="font-semibold">{spec.value}</span>
+                          </div>
                         ))}
                       </div>
-                    </div>
+                    </TabsContent>
+                  )}
 
-                    {/* Highlights */}
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Destaques</h3>
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        {destination.highlights.map((highlight, index) => (
+                  {destination.requirements.length > 0 && (
+                    <TabsContent value="requirements" className="space-y-4">
+                      <h3 className="text-xl font-semibold">Requisitos para Participação</h3>
+                      <div className="space-y-3">
+                        {destination.requirements.map((req, i) => (
                           <div
-                            key={index}
+                            key={i}
                             className="flex items-center gap-3 p-4 rounded-xl bg-card/50"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                              <Check className="h-4 w-4 text-primary" />
-                            </div>
-                            <span>{highlight}</span>
+                            <Shield className="h-5 w-5 text-primary shrink-0" />
+                            <span>{req}</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    {/* Included / Not Included */}
-                    <div className="grid md:grid-cols-2 gap-8">
-                      <div>
-                        <h3 className="text-xl font-semibold mb-4">Incluso</h3>
-                        <ul className="space-y-3">
-                          {destination.included.map((item, index) => (
-                            <li key={index} className="flex items-start gap-3">
-                              <Check className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
-                              <span className="text-muted-foreground">{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold mb-4">Não Incluso</h3>
-                        <ul className="space-y-3">
-                          {destination.notIncluded.map((item, index) => (
-                            <li key={index} className="flex items-start gap-3">
-                              <X className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                              <span className="text-muted-foreground">{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="specs" className="space-y-6">
-                    <h3 className="text-xl font-semibold">Especificações Técnicas</h3>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {destination.technicalSpecs.map((spec, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center p-4 rounded-xl bg-card/50"
-                        >
-                          <span className="text-muted-foreground">{spec.label}</span>
-                          <span className="font-semibold">{spec.value}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <Separator className="my-8" />
-
-                    {/* Operator info */}
-                    <div>
-                      <h3 className="text-xl font-semibold mb-4">Operadora</h3>
-                      <div className="flex items-center gap-4 p-4 rounded-xl bg-card/50">
-                        <div className="w-16 h-16 rounded-xl bg-secondary flex items-center justify-center">
-                          <Rocket className="h-8 w-8 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-lg">{destination.operator}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Local de lançamento: {destination.launchSite}
+                      <div className="p-6 rounded-xl bg-primary/10 border border-primary/20">
+                        <div className="flex items-start gap-4">
+                          <AlertTriangle className="h-6 w-6 text-primary shrink-0" />
+                          <div>
+                            <h4 className="font-semibold mb-2">Aviso Importante</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Todos os requisitos serão verificados durante o processo de reserva.
+                              Reembolso integral disponível caso não seja aprovado.
+                            </p>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="requirements" className="space-y-6">
-                    <h3 className="text-xl font-semibold">Requisitos para Participação</h3>
-                    <div className="space-y-3">
-                      {destination.requirements.map((req, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-3 p-4 rounded-xl bg-card/50"
-                        >
-                          <Shield className="h-5 w-5 text-primary shrink-0" />
-                          <span>{req}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="p-6 rounded-xl bg-primary/10 border border-primary/20">
-                      <div className="flex items-start gap-4">
-                        <AlertTriangle className="h-6 w-6 text-primary shrink-0" />
-                        <div>
-                          <h4 className="font-semibold mb-2">Aviso Importante</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Todos os requisitos serão verificados durante o processo de reserva. 
-                            Uma avaliação médica completa será realizada antes da confirmação final. 
-                            Reembolso integral disponível caso não seja aprovado.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
+                    </TabsContent>
+                  )}
 
                   <TabsContent value="reviews" className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xl font-semibold">Avaliações</h3>
                       <div className="flex items-center gap-2">
                         <Star className="h-5 w-5 fill-chart-5 text-chart-5" />
-                        <span className="font-semibold text-lg">{destination.rating}</span>
+                        <span className="font-semibold text-lg">
+                          {destination.rating.toFixed(1)}
+                        </span>
                         <span className="text-muted-foreground">
                           ({destination.reviewCount} avaliações)
                         </span>
                       </div>
                     </div>
 
-                    {destinationReviews.length > 0 ? (
+                    {reviews.length > 0 ? (
                       <div className="space-y-4">
-                        {destinationReviews.map((review) => (
+                        {reviews.map((review) => (
                           <div key={review.id} className="p-6 rounded-xl bg-card/50">
                             <div className="flex items-start justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="w-12 h-12 rounded-full bg-cover bg-center"
-                                  style={{ backgroundImage: `url(${review.userAvatar})` }}
-                                />
-                                <div>
-                                  <div className="font-semibold flex items-center gap-2">
-                                    {review.userName}
-                                    {review.verified && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Verificado
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Viajou em {formatDate(review.tripDate)}
-                                  </div>
+                              <div>
+                                <div className="font-semibold">Usuário #{review.usuario_id}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {formatDate(review.criado_em)}
                                 </div>
                               </div>
                               <div className="flex gap-1">
-                                {[...Array(review.rating)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className="h-4 w-4 fill-chart-5 text-chart-5"
-                                  />
+                                {Array.from({ length: review.nota }).map((_, i) => (
+                                  <Star key={i} className="h-4 w-4 fill-chart-5 text-chart-5" />
                                 ))}
                               </div>
                             </div>
-                            <h4 className="font-semibold mb-2">{review.title}</h4>
-                            <p className="text-muted-foreground">{review.content}</p>
+                            {review.comentario && (
+                              <p className="text-muted-foreground">{review.comentario}</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -386,6 +371,31 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                       </div>
                     )}
                   </TabsContent>
+
+                  {disponibilidades.length > 0 && (
+                    <TabsContent value="disponibilidades" className="space-y-4">
+                      <h3 className="text-xl font-semibold">Datas Disponíveis</h3>
+                      <div className="space-y-3">
+                        {disponibilidades.map((d) => (
+                          <div
+                            key={d.id}
+                            className="flex items-center justify-between p-4 rounded-xl bg-card/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Calendar className="h-5 w-5 text-primary" />
+                              <span className="font-medium">{formatDate(d.data_partida)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              <span>
+                                {d.vagas_disponiveis} / {d.vagas_totais} vagas
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  )}
                 </Tabs>
               </motion.div>
             </div>
@@ -399,63 +409,92 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                 className="sticky top-24"
               >
                 <div className="glass rounded-2xl p-6 border border-border/50">
-                  {/* Price */}
                   <div className="mb-6">
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-bold">{formatPrice(destination.price)}</span>
                       <span className="text-muted-foreground">USD / pessoa</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Parcelável em até 12x
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Parcelável em até 12x</p>
                   </div>
 
                   <Separator className="mb-6" />
 
                   {/* Availability */}
-                  <div className="space-y-4 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4" />
-                        <span>Próximo lançamento</span>
+                  {nextDisponibilidade ? (
+                    <div className="space-y-4 mb-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4" />
+                          <span>Próximo lançamento</span>
+                        </div>
+                        <span className="font-semibold text-sm">
+                          {formatDate(nextDisponibilidade.data_partida)}
+                        </span>
                       </div>
-                      <span className="font-semibold">{formatDate(destination.nextLaunch)}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="h-4 w-4" />
+                          <span>Vagas disponíveis</span>
+                        </div>
+                        <span className="font-semibold">
+                          {nextDisponibilidade.vagas_disponiveis} de{" "}
+                          {nextDisponibilidade.vagas_totais}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                          style={{
+                            width: `${((nextDisponibilidade.vagas_totais - nextDisponibilidade.vagas_disponiveis) / nextDisponibilidade.vagas_totais) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      {nextDisponibilidade.vagas_disponiveis <= 3 && (
+                        <p className="text-xs text-destructive">Últimas vagas! Reserve agora.</p>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm">
+                  ) : destination.maxCapacity > 0 ? (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span>Vagas disponíveis</span>
+                        <span>Capacidade: {destination.maxCapacity} passageiros</span>
                       </div>
-                      <span className="font-semibold">
-                        {destination.availability} de {destination.maxCapacity}
-                      </span>
                     </div>
-                  </div>
+                  ) : null}
 
-                  {/* Availability bar */}
-                  <div className="mb-6">
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                        style={{
-                          width: `${((destination.maxCapacity - destination.availability) / destination.maxCapacity) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {destination.availability <= 3
-                        ? "🔥 Últimas vagas! Reserve agora."
-                        : "Vagas preenchendo rapidamente"}
-                    </p>
-                  </div>
-
-                  {/* CTA Buttons */}
+                  {/* CTA */}
                   <div className="space-y-3">
-                    <Link href={`/checkout/${destination.slug}`} className="block">
-                      <Button size="lg" className="w-full">
-                        Reservar Agora
-                      </Button>
-                    </Link>
+                    {bookingMsg ? (
+                      <div
+                        className={cn(
+                          "p-3 rounded-lg text-sm text-center",
+                          bookingMsg.includes("sucesso")
+                            ? "bg-green-500/20 text-green-400"
+                            : "bg-destructive/20 text-destructive"
+                        )}
+                      >
+                        {bookingMsg}
+                      </div>
+                    ) : null}
+
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      onClick={handleReservar}
+                      disabled={booking}
+                    >
+                      {booking ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Reservando...
+                        </>
+                      ) : user ? (
+                        "Reservar Agora"
+                      ) : (
+                        "Entrar para Reservar"
+                      )}
+                    </Button>
+
                     <Link href="/assistente" className="block">
                       <Button variant="outline" size="lg" className="w-full gap-2">
                         <Sparkles className="h-4 w-4" />
@@ -464,10 +503,9 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                     </Link>
                   </div>
 
-                  {/* Trust badges */}
                   <div className="mt-6 pt-6 border-t border-border/50">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Shield className="h-4 w-4" />
+                      <Check className="h-4 w-4" />
                       <span>Cancelamento gratuito até 30 dias antes</span>
                     </div>
                   </div>

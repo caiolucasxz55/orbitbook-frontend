@@ -1,19 +1,36 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DestinationCard } from "@/components/destinations/destination-card"
-import { destinations } from "@/data/destinations"
+import { api, apiDestinoToDestination } from "@/lib/api"
+import type { Destination } from "@/types"
 
 export function FeaturedDestinations() {
-  const featuredDestinations = destinations.filter((d) => d.featured).slice(0, 8)
+  const [destinations, setDestinations] = useState<Destination[]>([])
+
+  useEffect(() => {
+    api.destinos
+      .list()
+      .then((dests) =>
+        setDestinations(
+          dests
+            .map(apiDestinoToDestination)
+            .filter((d) => d.featured)
+            .slice(0, 8)
+        )
+      )
+      .catch(() => {})
+  }, [])
+
+  if (destinations.length === 0) return null
 
   return (
     <section className="py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -37,14 +54,9 @@ export function FeaturedDestinations() {
           </Link>
         </motion.div>
 
-        {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredDestinations.map((destination, index) => (
-            <DestinationCard
-              key={destination.id}
-              destination={destination}
-              index={index}
-            />
+          {destinations.map((destination, index) => (
+            <DestinationCard key={destination.id} destination={destination} index={index} />
           ))}
         </div>
       </div>
