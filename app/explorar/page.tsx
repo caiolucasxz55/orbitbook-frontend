@@ -1,8 +1,21 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Search, SlidersHorizontal, X } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+  Search,
+  SlidersHorizontal,
+  X,
+  Rocket,
+  Globe,
+  Moon,
+  Star,
+  Telescope,
+  Zap,
+  ChevronDown,
+  LayoutGrid,
+  LayoutList,
+} from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { DestinationCard } from "@/components/destinations/destination-card"
@@ -23,47 +36,45 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { api, apiDestinoToDestination } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type { Destination } from "@/types"
 
 const categories = [
-  { id: "all", name: "Todos" },
-  { id: "suborbital", name: "Suborbital" },
-  { id: "leo", name: "Órbita Terrestre" },
-  { id: "lunar", name: "Lunar" },
-  { id: "mars", name: "Marte" },
+  { id: "all", name: "Todos", icon: Telescope },
+  { id: "suborbital", name: "Suborbital", icon: Zap },
+  { id: "leo", name: "Órbita Terrestre", icon: Globe },
+  { id: "lunar", name: "Lunar", icon: Moon },
+  { id: "mars", name: "Marte", icon: Rocket },
+  { id: "deepspace", name: "Espaço Profundo", icon: Star },
 ]
 
 const priceRanges = [
-  { id: "all", name: "Todos os preços", min: 0, max: Infinity },
-  { id: "entry", name: "Até $1M", min: 0, max: 1000000 },
-  { id: "mid", name: "$1M - $50M", min: 1000000, max: 50000000 },
-  { id: "high", name: "$50M - $200M", min: 50000000, max: 200000000 },
-  { id: "ultra", name: "Acima de $200M", min: 200000000, max: Infinity },
+  { id: "all", label: "Todos os preços", min: 0, max: Infinity },
+  { id: "entry", label: "Até $1M", min: 0, max: 1_000_000 },
+  { id: "mid", label: "$1M – $50M", min: 1_000_000, max: 50_000_000 },
+  { id: "high", label: "$50M – $200M", min: 50_000_000, max: 200_000_000 },
+  { id: "ultra", label: "Acima de $200M", min: 200_000_000, max: Infinity },
 ]
 
-const riskLevels = ["Baixo", "Moderado", "Alto", "Extremo"]
-
 const sortOptions = [
-  { value: "popularity", label: "Popularidade" },
+  { value: "popularity", label: "Mais Populares" },
   { value: "price-asc", label: "Menor Preço" },
   { value: "price-desc", label: "Maior Preço" },
-  { value: "rating", label: "Avaliação" },
-  { value: "duration", label: "Duração" },
+  { value: "rating", label: "Melhor Avaliados" },
+  { value: "capacity-asc", label: "Menor Capacidade" },
 ]
 
 export default function ExplorarPage() {
   const [allDestinations, setAllDestinations] = useState<Destination[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [selectedRisks, setSelectedRisks] = useState<string[]>([])
-  const [selectedPriceRange, setSelectedPriceRange] = useState<string>("all")
+  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [selectedPriceRange, setSelectedPriceRange] = useState("all")
   const [sortBy, setSortBy] = useState("popularity")
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
   useEffect(() => {
     api.destinos
@@ -73,34 +84,30 @@ export default function ExplorarPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: allDestinations.length }
+    for (const d of allDestinations) {
+      counts[d.category] = (counts[d.category] ?? 0) + 1
+    }
+    return counts
+  }, [allDestinations])
+
   const filteredDestinations = useMemo(() => {
-    let filtered = allDestinations.filter((destination) => {
+    let filtered = allDestinations.filter((d) => {
       if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+        const q = searchQuery.toLowerCase()
         if (
-          !destination.name.toLowerCase().includes(query) &&
-          !destination.description.toLowerCase().includes(query) &&
-          !destination.tagline.toLowerCase().includes(query)
-        ) {
+          !d.name.toLowerCase().includes(q) &&
+          !d.description.toLowerCase().includes(q) &&
+          !d.tagline.toLowerCase().includes(q)
+        )
           return false
-        }
       }
-
-      if (selectedCategory !== "all" && destination.category !== selectedCategory) {
-        return false
-      }
-
-      if (selectedRisks.length > 0 && !selectedRisks.includes(destination.riskLevel)) {
-        return false
-      }
-
+      if (selectedCategory !== "all" && d.category !== selectedCategory) return false
       if (selectedPriceRange !== "all") {
         const range = priceRanges.find((r) => r.id === selectedPriceRange)
-        if (range && (destination.price < range.min || destination.price > range.max)) {
-          return false
-        }
+        if (range && (d.price < range.min || d.price > range.max)) return false
       }
-
       return true
     })
 
@@ -114,244 +121,384 @@ export default function ExplorarPage() {
       case "rating":
         filtered.sort((a, b) => b.rating - a.rating)
         break
-      case "duration":
-        filtered.sort((a, b) => a.durationDays - b.durationDays)
+      case "capacity-asc":
+        filtered.sort((a, b) => a.maxCapacity - b.maxCapacity)
         break
       default:
         filtered.sort((a, b) => b.reviewCount - a.reviewCount)
     }
 
     return filtered
-  }, [allDestinations, searchQuery, selectedCategory, selectedRisks, selectedPriceRange, sortBy])
+  }, [allDestinations, searchQuery, selectedCategory, selectedPriceRange, sortBy])
 
   const activeFiltersCount =
-    (selectedCategory !== "all" ? 1 : 0) +
-    selectedRisks.length +
-    (selectedPriceRange !== "all" ? 1 : 0)
+    (selectedCategory !== "all" ? 1 : 0) + (selectedPriceRange !== "all" ? 1 : 0)
 
   const clearFilters = () => {
     setSelectedCategory("all")
-    setSelectedRisks([])
     setSelectedPriceRange("all")
     setSearchQuery("")
   }
 
-  const toggleRisk = (risk: string) => {
-    setSelectedRisks((prev) =>
-      prev.includes(risk) ? prev.filter((r) => r !== risk) : [...prev, risk]
-    )
-  }
+  const skeletonCount = viewMode === "grid" ? 8 : 6
 
   return (
     <main className="min-h-screen bg-background">
       <Header />
 
-      <div className="pt-24 pb-16">
+      {/* Page Header */}
+      <section className="pt-24 pb-10 border-b border-border/50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="mb-8"
+            className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8"
           >
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
-              Catálogo de Experiências
-            </h1>
-            <p className="text-muted-foreground">
-              {loading
-                ? "Carregando destinos..."
-                : `${allDestinations.length} experiências disponíveis`}
-            </p>
+            <div>
+              <p className="text-sm text-primary font-medium mb-2 tracking-wide uppercase">
+                Catálogo
+              </p>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+                Experiências Espaciais
+              </h1>
+              <p className="text-muted-foreground">
+                {loading
+                  ? "Carregando destinos..."
+                  : `${allDestinations.length} experiências disponíveis para reserva`}
+              </p>
+            </div>
           </motion.div>
 
-          {/* Category Tabs */}
+          {/* Category Filter */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.05 }}
-            className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide"
+            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
           >
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
-                  selectedCategory === category.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                )}
-              >
-                {category.name}
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const Icon = cat.icon
+              const count = categoryCounts[cat.id] ?? 0
+              const isActive = selectedCategory === cat.id
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                      : "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {cat.name}
+                  {count > 0 && cat.id !== "all" && (
+                    <span
+                      className={cn(
+                        "text-xs px-1.5 py-0.5 rounded-full font-semibold",
+                        isActive ? "bg-white/20" : "bg-secondary"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </motion.div>
+        </div>
+      </section>
 
-          {/* Search and Filters Bar */}
+      <div className="py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Toolbar */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
             className="flex flex-col sm:flex-row gap-3 mb-6"
           >
+            {/* Search */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Buscar por nome ou descrição..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-card"
+                className="pl-10 bg-card h-10"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
+            {/* Price Range */}
             <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
-              <SelectTrigger className="w-full sm:w-44 bg-card">
+              <SelectTrigger className="w-full sm:w-44 bg-card h-10 gap-1">
                 <SelectValue placeholder="Preço" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </SelectTrigger>
               <SelectContent>
-                {priceRanges.map((range) => (
-                  <SelectItem key={range.id} value={range.id}>
-                    {range.name}
+                {priceRanges.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
+            {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-44 bg-card">
-                <SelectValue placeholder="Ordenar por" />
+              <SelectTrigger className="w-full sm:w-48 bg-card h-10 gap-1">
+                <SelectValue placeholder="Ordenar" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </SelectTrigger>
               <SelectContent>
-                {sortOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                {sortOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
+            {/* Filters sheet */}
             <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="h-10 gap-2 relative">
                   <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden sm:inline">Mais Filtros</span>
+                  <span className="hidden sm:inline">Filtros</span>
                   {activeFiltersCount > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
                       {activeFiltersCount}
-                    </Badge>
+                    </span>
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:w-96">
+              <SheetContent side="right" className="w-full sm:w-80">
                 <SheetHeader>
-                  <SheetTitle>Filtros Avançados</SheetTitle>
+                  <SheetTitle>Filtros</SheetTitle>
                 </SheetHeader>
+
                 <div className="mt-6 space-y-6">
                   <div>
-                    <h3 className="font-medium mb-3">Nível de Risco</h3>
-                    <div className="space-y-2">
-                      {riskLevels.map((risk) => (
-                        <div key={risk} className="flex items-center space-x-3">
-                          <Checkbox
-                            id={risk}
-                            checked={selectedRisks.includes(risk)}
-                            onCheckedChange={() => toggleRisk(risk)}
-                          />
-                          <Label htmlFor={risk} className="cursor-pointer text-sm">
-                            {risk}
-                          </Label>
-                        </div>
+                    <h3 className="font-medium text-sm mb-3">Faixa de Preço</h3>
+                    <div className="space-y-1">
+                      {priceRanges.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => {
+                            setSelectedPriceRange(r.id)
+                            setFiltersOpen(false)
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
+                            selectedPriceRange === r.id
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {r.label}
+                          {selectedPriceRange === r.id && (
+                            <div className="w-2 h-2 rounded-full bg-primary" />
+                          )}
+                        </button>
                       ))}
                     </div>
                   </div>
 
+                  <Separator />
+
+                  <div>
+                    <h3 className="font-medium text-sm mb-3">Categoria</h3>
+                    <div className="space-y-1">
+                      {categories.map((cat) => {
+                        const Icon = cat.icon
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => {
+                              setSelectedCategory(cat.id)
+                              setFiltersOpen(false)
+                            }}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                              selectedCategory === cat.id
+                                ? "bg-primary/10 text-primary font-medium"
+                                : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                            {cat.name}
+                            {selectedCategory === cat.id && (
+                              <div className="w-2 h-2 rounded-full bg-primary ml-auto" />
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {activeFiltersCount > 0 && (
-                    <Button variant="outline" onClick={clearFilters} className="w-full">
-                      Limpar Todos os Filtros
-                    </Button>
+                    <>
+                      <Separator />
+                      <Button variant="outline" onClick={clearFilters} className="w-full">
+                        Limpar todos os filtros
+                      </Button>
+                    </>
                   )}
                 </div>
               </SheetContent>
             </Sheet>
+
+            {/* View mode toggle */}
+            <div className="hidden sm:flex items-center gap-1 rounded-lg border border-border p-1 bg-card">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  viewMode === "grid"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  viewMode === "list"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutList className="h-4 w-4" />
+              </button>
+            </div>
           </motion.div>
 
-          {/* Active Filters */}
-          {activeFiltersCount > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="flex flex-wrap items-center gap-2 mb-6"
-            >
-              <span className="text-sm text-muted-foreground">Filtros ativos:</span>
-              {selectedCategory !== "all" && (
-                <Badge
-                  variant="secondary"
-                  className="gap-1 cursor-pointer"
-                  onClick={() => setSelectedCategory("all")}
+          {/* Active filter chips */}
+          <AnimatePresence>
+            {activeFiltersCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex flex-wrap items-center gap-2 mb-5"
+              >
+                <span className="text-xs text-muted-foreground">Ativos:</span>
+                {selectedCategory !== "all" && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setSelectedCategory("all")}
+                  >
+                    {categories.find((c) => c.id === selectedCategory)?.name}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {selectedPriceRange !== "all" && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setSelectedPriceRange("all")}
+                  >
+                    {priceRanges.find((r) => r.id === selectedPriceRange)?.label}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {categories.find((c) => c.id === selectedCategory)?.name}
-                  <X className="h-3 w-3" />
-                </Badge>
-              )}
-              {selectedPriceRange !== "all" && (
-                <Badge
-                  variant="secondary"
-                  className="gap-1 cursor-pointer"
-                  onClick={() => setSelectedPriceRange("all")}
-                >
-                  {priceRanges.find((r) => r.id === selectedPriceRange)?.name}
-                  <X className="h-3 w-3" />
-                </Badge>
-              )}
-              {selectedRisks.map((risk) => (
-                <Badge
-                  key={risk}
-                  variant="secondary"
-                  className="gap-1 cursor-pointer"
-                  onClick={() => toggleRisk(risk)}
-                >
-                  {risk}
-                  <X className="h-3 w-3" />
-                </Badge>
-              ))}
-              <button onClick={clearFilters} className="text-sm text-primary hover:underline">
-                Limpar todos
-              </button>
-            </motion.div>
-          )}
+                  Limpar todos
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Results Info */}
-          <div className="flex items-center justify-between mb-6">
+          {/* Results count */}
+          <div className="flex items-center justify-between mb-5">
             <p className="text-sm text-muted-foreground">
-              {filteredDestinations.length} resultado{filteredDestinations.length !== 1 ? "s" : ""}
-              {searchQuery && ` para "${searchQuery}"`}
+              {loading ? (
+                <span className="inline-block w-36 h-4 bg-secondary rounded animate-pulse" />
+              ) : (
+                <>
+                  <span className="font-semibold text-foreground">{filteredDestinations.length}</span>{" "}
+                  resultado{filteredDestinations.length !== 1 ? "s" : ""}
+                  {searchQuery && (
+                    <span>
+                      {" "}para{" "}
+                      <span className="text-primary font-medium">&quot;{searchQuery}&quot;</span>
+                    </span>
+                  )}
+                </>
+              )}
             </p>
           </div>
 
-          {/* Grid */}
+          {/* Grid / List */}
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-card rounded-xl border border-border animate-pulse h-72" />
+            <div
+              className={cn(
+                "grid gap-5",
+                viewMode === "grid"
+                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "grid-cols-1 sm:grid-cols-2"
+              )}
+            >
+              {Array.from({ length: skeletonCount }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-card rounded-2xl border border-border animate-pulse"
+                  style={{ height: viewMode === "grid" ? 280 : 200 }}
+                />
               ))}
             </div>
           ) : filteredDestinations.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {filteredDestinations.map((destination, index) => (
-                <DestinationCard key={destination.id} destination={destination} index={index} />
-              ))}
-            </div>
+            <motion.div
+              layout
+              className={cn(
+                "grid gap-5",
+                viewMode === "grid"
+                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "grid-cols-1 sm:grid-cols-2"
+              )}
+            >
+              <AnimatePresence mode="popLayout">
+                {filteredDestinations.map((destination, index) => (
+                  <DestinationCard
+                    key={destination.id}
+                    destination={destination}
+                    index={index}
+                    variant={viewMode === "list" ? "compact" : "default"}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
           ) : (
-            <div className="text-center py-16 bg-card rounded-xl border border-border">
-              <div className="text-4xl mb-4">🔭</div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-20 bg-card rounded-2xl border border-border"
+            >
+              <div className="text-5xl mb-4">🔭</div>
               <h3 className="text-lg font-semibold mb-2">Nenhum destino encontrado</h3>
-              <p className="text-muted-foreground mb-4 text-sm">
-                Tente ajustar seus filtros ou buscar por outro termo.
+              <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
+                Tente ajustar os filtros ou buscar por outro termo.
               </p>
               <Button variant="outline" size="sm" onClick={clearFilters}>
                 Limpar Filtros
               </Button>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>

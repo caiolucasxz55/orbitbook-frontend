@@ -7,19 +7,19 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   Star,
-  Clock,
   MapPin,
   Users,
-  AlertTriangle,
   Check,
   ChevronLeft,
   Share2,
-  Heart,
   Sparkles,
-  Calendar,
   Shield,
   Rocket,
   Loader2,
+  Minus,
+  Plus,
+  CalendarDays,
+  CheckCircle2,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -27,29 +27,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  api,
-  apiDestinoToDestination,
-  type ApiAvaliacao,
-  type ApiDisponibilidade,
-} from "@/lib/api"
+import { api, apiDestinoToDestination, type ApiAvaliacao } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import type { Destination, Badge as BadgeType } from "@/types"
 
 const badgeStyles: Record<BadgeType["type"], string> = {
-  popular: "bg-primary/20 text-primary border-primary/30",
+  popular: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   new: "bg-accent/20 text-accent border-accent/30",
   lastSeats: "bg-destructive/20 text-destructive border-destructive/30",
-  exclusive: "bg-gradient-to-r from-primary/20 to-accent/20 text-foreground border-primary/30",
-  promoted: "bg-chart-5/20 text-chart-5 border-chart-5/30",
-}
-
-const riskColors: Record<string, string> = {
-  Baixo: "text-green-400",
-  Moderado: "text-yellow-400",
-  Alto: "text-orange-400",
-  Extremo: "text-red-400",
+  exclusive: "bg-primary/20 text-primary border-primary/30",
+  promoted: "bg-amber-500/20 text-amber-400 border-amber-500/30",
 }
 
 const formatPrice = (price: number) =>
@@ -67,6 +55,14 @@ const formatDate = (dateStr: string) =>
     year: "numeric",
   })
 
+const today = () => new Date().toISOString().split("T")[0]
+const minReturn = (dep: string) => {
+  if (!dep) return today()
+  const d = new Date(dep)
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().split("T")[0]
+}
+
 export default function DestinoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const router = useRouter()
@@ -74,46 +70,64 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
 
   const [destination, setDestination] = useState<Destination | null>(null)
   const [reviews, setReviews] = useState<ApiAvaliacao[]>([])
-  const [disponibilidades, setDisponibilidades] = useState<ApiDisponibilidade[]>([])
   const [loading, setLoading] = useState(true)
+
+  const [passengers, setPassengers] = useState(1)
+  const [departureDate, setDepartureDate] = useState("")
+  const [returnDate, setReturnDate] = useState("")
   const [booking, setBooking] = useState(false)
-  const [bookingMsg, setBookingMsg] = useState("")
+  const [bookingSuccess, setBookingSuccess] = useState(false)
+  const [bookingError, setBookingError] = useState("")
 
   useEffect(() => {
     const id = parseInt(slug)
-    if (isNaN(id)) { router.replace("/explorar"); return }
+    if (isNaN(id)) {
+      router.replace("/explorar")
+      return
+    }
 
     Promise.all([
       api.destinos.get(id).then(apiDestinoToDestination),
       api.avaliacoes.listByDestino(id).catch(() => [] as ApiAvaliacao[]),
-      api.destinos.disponibilidades(id).catch(() => [] as ApiDisponibilidade[]),
     ])
-      .then(([dest, revs, disps]) => {
+      .then(([dest, revs]) => {
         setDestination(dest)
         setReviews(revs)
-        setDisponibilidades(disps)
       })
       .catch(() => router.replace("/explorar"))
       .finally(() => setLoading(false))
   }, [slug, router])
 
-  const nextDisponibilidade = disponibilidades.find((d) => d.vagas_disponiveis > 0)
+  const totalPrice = destination ? destination.price * passengers : 0
 
   async function handleReservar() {
-    if (!user) { openAuthModal(); return }
+    if (!user) {
+      openAuthModal()
+      return
+    }
     if (!destination) return
+    if (!departureDate) {
+      setBookingError("Selecione a data de partida.")
+      return
+    }
+    if (!returnDate) {
+      setBookingError("Selecione a data de retorno.")
+      return
+    }
 
     setBooking(true)
-    setBookingMsg("")
+    setBookingError("")
+    setBookingSuccess(false)
     try {
       await api.reservas.create({
         destino_id: parseInt(destination.id),
-        disponibilidade_id: nextDisponibilidade?.id,
-        num_passageiros: 1,
+        departure_date: departureDate,
+        return_date: returnDate,
+        num_passageiros: passengers,
       })
-      setBookingMsg("Reserva criada com sucesso! Confira no seu dashboard.")
+      setBookingSuccess(true)
     } catch (err: unknown) {
-      setBookingMsg(err instanceof Error ? err.message : "Erro ao criar reserva")
+      setBookingError(err instanceof Error ? err.message : "Erro ao criar reserva")
     } finally {
       setBooking(false)
     }
@@ -138,7 +152,7 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
       <Header />
 
       {/* Hero */}
-      <section className="relative h-[60vh] min-h-[500px]">
+      <section className="relative h-[65vh] min-h-130">
         <Image
           src={destination.heroImage}
           alt={destination.name}
@@ -146,69 +160,72 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-transparent" />
 
+        {/* Back button */}
         <div className="absolute top-24 left-4 sm:left-8 z-10">
           <Link href="/explorar">
-            <Button variant="ghost" className="glass gap-2">
+            <Button variant="ghost" size="sm" className="glass gap-2 h-9">
               <ChevronLeft className="h-4 w-4" />
-              Voltar
+              Catálogo
             </Button>
           </Link>
         </div>
 
-        <div className="absolute top-24 right-4 sm:right-8 z-10 flex gap-2">
-          <Button variant="ghost" size="icon" className="glass">
+        {/* Share */}
+        <div className="absolute top-24 right-4 sm:right-8 z-10">
+          <Button variant="ghost" size="icon" className="glass h-9 w-9">
             <Share2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="glass">
-            <Heart className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8">
+        {/* Hero content */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8 lg:p-12">
           <div className="mx-auto max-w-7xl">
-            <div className="flex flex-wrap gap-2 mb-4">
-              {destination.badges.map((badge) => (
-                <Badge
-                  key={badge.type}
-                  variant="outline"
-                  className={cn("text-xs font-medium", badgeStyles[badge.type])}
-                >
-                  {badge.label}
-                </Badge>
-              ))}
-            </div>
+            {destination.badges.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {destination.badges.map((badge) => (
+                  <Badge
+                    key={badge.type}
+                    variant="outline"
+                    className={cn("text-xs font-medium backdrop-blur-sm", badgeStyles[badge.type])}
+                  >
+                    {badge.label}
+                  </Badge>
+                ))}
+              </div>
+            )}
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-3">
               {destination.name}
             </h1>
+            <p className="text-lg text-muted-foreground mb-5 max-w-2xl line-clamp-2">
+              {destination.tagline}
+            </p>
 
-            <p className="text-xl text-muted-foreground mb-6 max-w-2xl">{destination.tagline}</p>
-
-            <div className="flex flex-wrap items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 fill-chart-5 text-chart-5" />
-                <span className="font-semibold">{destination.rating.toFixed(1)}</span>
-                <span className="text-muted-foreground">({destination.reviewCount} avaliações)</span>
-              </div>
-              {destination.duration !== "A definir" && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{destination.duration}</span>
+            <div className="flex flex-wrap items-center gap-5 text-sm">
+              {destination.rating > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold">{destination.rating.toFixed(1)}</span>
+                  <span className="text-muted-foreground">({destination.reviewCount} avaliações)</span>
                 </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Sem avaliações ainda</span>
               )}
               {destination.distance && (
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
                   <span>{destination.distance}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <AlertTriangle className={cn("h-4 w-4", riskColors[destination.riskLevel])} />
-                <span className={riskColors[destination.riskLevel]}>Risco {destination.riskLevel}</span>
-              </div>
+              {destination.maxCapacity > 0 && (
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                  <span>Até {destination.maxCapacity} passageiros</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -217,58 +234,40 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
       {/* Content */}
       <section className="py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-12">
+          <div className="grid lg:grid-cols-3 gap-10">
+            {/* Main content */}
+            <div className="lg:col-span-2 space-y-10">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
                 <Tabs defaultValue="about" className="w-full">
-                  <TabsList className="w-full justify-start bg-card/50 p-1 mb-8">
-                    <TabsTrigger value="about">Sobre</TabsTrigger>
+                  <TabsList className="w-full justify-start bg-card/50 border border-border/50 p-1 mb-8">
+                    <TabsTrigger value="about" className="flex-1 sm:flex-none">Sobre</TabsTrigger>
                     {destination.technicalSpecs.length > 0 && (
-                      <TabsTrigger value="specs">Especificações</TabsTrigger>
+                      <TabsTrigger value="specs" className="flex-1 sm:flex-none">Especificações</TabsTrigger>
                     )}
-                    {destination.requirements.length > 0 && (
-                      <TabsTrigger value="requirements">Requisitos</TabsTrigger>
-                    )}
-                    <TabsTrigger value="reviews">
-                      Avaliações {reviews.length > 0 && `(${reviews.length})`}
+                    <TabsTrigger value="reviews" className="flex-1 sm:flex-none">
+                      Avaliações{reviews.length > 0 ? ` (${reviews.length})` : ""}
                     </TabsTrigger>
-                    {disponibilidades.length > 0 && (
-                      <TabsTrigger value="disponibilidades">Datas</TabsTrigger>
-                    )}
                   </TabsList>
 
+                  {/* About tab */}
                   <TabsContent value="about" className="space-y-8">
-                    {destination.description ? (
+                    {destination.description && (
                       <div>
-                        <h3 className="text-xl font-semibold mb-4">Descrição</h3>
-                        <p className="text-muted-foreground leading-relaxed">
+                        <h2 className="text-xl font-semibold mb-4">Sobre a Missão</h2>
+                        <p className="text-muted-foreground leading-relaxed text-base">
                           {destination.description}
                         </p>
                       </div>
-                    ) : (
-                      <p className="text-muted-foreground">Descrição não disponível.</p>
                     )}
 
                     <div className="grid sm:grid-cols-2 gap-4">
-                      {destination.operator && (
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-card/50">
-                          <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
-                            <Rocket className="h-6 w-6 text-primary" />
-                          </div>
-                          <div>
-                            <div className="font-semibold">{destination.operator}</div>
-                            <div className="text-sm text-muted-foreground">Operadora</div>
-                          </div>
-                        </div>
-                      )}
                       {destination.maxCapacity > 0 && (
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-card/50">
-                          <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center">
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-card/60 border border-border/50">
+                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                             <Users className="h-6 w-6 text-primary" />
                           </div>
                           <div>
@@ -277,130 +276,116 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                           </div>
                         </div>
                       )}
+                      {destination.distance && (
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-card/60 border border-border/50">
+                          <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                            <MapPin className="h-6 w-6 text-accent" />
+                          </div>
+                          <div>
+                            <div className="font-semibold">{destination.distance}</div>
+                            <div className="text-sm text-muted-foreground">Distância da Terra</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* What's included */}
+                    <div className="p-6 rounded-2xl bg-card/60 border border-border/50">
+                      <div className="flex items-start gap-4">
+                        <Shield className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                        <div>
+                          <h3 className="font-semibold mb-2">Política de Cancelamento</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Cancelamento gratuito até 30 dias antes da data de partida. Após isso,
+                            aplica-se tarifa de cancelamento proporcional.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </TabsContent>
 
+                  {/* Specs tab */}
                   {destination.technicalSpecs.length > 0 && (
                     <TabsContent value="specs" className="space-y-4">
-                      <h3 className="text-xl font-semibold">Especificações Técnicas</h3>
-                      <div className="grid sm:grid-cols-2 gap-4">
+                      <h2 className="text-xl font-semibold">Especificações Técnicas</h2>
+                      <div className="grid sm:grid-cols-2 gap-3">
                         {destination.technicalSpecs.map((spec, i) => (
                           <div
                             key={i}
-                            className="flex justify-between items-center p-4 rounded-xl bg-card/50"
+                            className="flex items-center justify-between p-4 rounded-xl bg-card/60 border border-border/50"
                           >
-                            <span className="text-muted-foreground">{spec.label}</span>
-                            <span className="font-semibold">{spec.value}</span>
+                            <span className="text-sm text-muted-foreground">{spec.label}</span>
+                            <span className="font-semibold text-sm">{spec.value}</span>
                           </div>
                         ))}
                       </div>
                     </TabsContent>
                   )}
 
-                  {destination.requirements.length > 0 && (
-                    <TabsContent value="requirements" className="space-y-4">
-                      <h3 className="text-xl font-semibold">Requisitos para Participação</h3>
-                      <div className="space-y-3">
-                        {destination.requirements.map((req, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-3 p-4 rounded-xl bg-card/50"
-                          >
-                            <Shield className="h-5 w-5 text-primary shrink-0" />
-                            <span>{req}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-6 rounded-xl bg-primary/10 border border-primary/20">
-                        <div className="flex items-start gap-4">
-                          <AlertTriangle className="h-6 w-6 text-primary shrink-0" />
-                          <div>
-                            <h4 className="font-semibold mb-2">Aviso Importante</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Todos os requisitos serão verificados durante o processo de reserva.
-                              Reembolso integral disponível caso não seja aprovado.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  )}
-
+                  {/* Reviews tab */}
                   <TabsContent value="reviews" className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-semibold">Avaliações</h3>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-5 w-5 fill-chart-5 text-chart-5" />
-                        <span className="font-semibold text-lg">
-                          {destination.rating.toFixed(1)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          ({destination.reviewCount} avaliações)
-                        </span>
-                      </div>
+                      <h2 className="text-xl font-semibold">Avaliações</h2>
+                      {destination.rating > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                          <span className="font-semibold text-lg">{destination.rating.toFixed(1)}</span>
+                          <span className="text-muted-foreground text-sm">({destination.reviewCount})</span>
+                        </div>
+                      )}
                     </div>
 
                     {reviews.length > 0 ? (
                       <div className="space-y-4">
                         {reviews.map((review) => (
-                          <div key={review.id} className="p-6 rounded-xl bg-card/50">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <div className="font-semibold">Usuário #{review.usuario_id}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {formatDate(review.criado_em)}
+                          <div key={review.id} className="p-5 rounded-2xl bg-card/60 border border-border/50">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-xs font-semibold text-primary">
+                                    {review.usuario_id ?? "?"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium">Viajante #{review.usuario_id}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {review.criado_em ? formatDate(review.criado_em) : ""}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="flex gap-1">
-                                {Array.from({ length: review.nota }).map((_, i) => (
-                                  <Star key={i} className="h-4 w-4 fill-chart-5 text-chart-5" />
+                              <div className="flex gap-0.5">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={cn(
+                                      "h-4 w-4",
+                                      i < review.nota
+                                        ? "fill-amber-400 text-amber-400"
+                                        : "text-muted-foreground/30"
+                                    )}
+                                  />
                                 ))}
                               </div>
                             </div>
                             {review.comentario && (
-                              <p className="text-muted-foreground">{review.comentario}</p>
+                              <p className="text-sm text-muted-foreground">{review.comentario}</p>
                             )}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Este destino ainda não possui avaliações.</p>
-                        <p className="text-sm">Seja o primeiro a avaliar!</p>
+                      <div className="text-center py-14 text-muted-foreground bg-card/40 rounded-2xl border border-border/50">
+                        <Star className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p className="font-medium">Sem avaliações ainda</p>
+                        <p className="text-sm mt-1">Seja o primeiro a avaliar após sua missão!</p>
                       </div>
                     )}
                   </TabsContent>
-
-                  {disponibilidades.length > 0 && (
-                    <TabsContent value="disponibilidades" className="space-y-4">
-                      <h3 className="text-xl font-semibold">Datas Disponíveis</h3>
-                      <div className="space-y-3">
-                        {disponibilidades.map((d) => (
-                          <div
-                            key={d.id}
-                            className="flex items-center justify-between p-4 rounded-xl bg-card/50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Calendar className="h-5 w-5 text-primary" />
-                              <span className="font-medium">{formatDate(d.data_partida)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Users className="h-4 w-4" />
-                              <span>
-                                {d.vagas_disponiveis} / {d.vagas_totais} vagas
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </TabsContent>
-                  )}
                 </Tabs>
               </motion.div>
             </div>
 
-            {/* Sidebar - Booking Card */}
+            {/* Booking sidebar */}
             <div className="lg:col-span-1">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -408,108 +393,188 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="sticky top-24"
               >
-                <div className="glass rounded-2xl p-6 border border-border/50">
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold">{formatPrice(destination.price)}</span>
-                      <span className="text-muted-foreground">USD / pessoa</span>
+                {bookingSuccess ? (
+                  /* Success state */
+                  <div className="glass rounded-2xl p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 className="h-8 w-8 text-green-400" />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">Parcelável em até 12x</p>
+                    <h3 className="text-xl font-bold mb-2">Reserva Confirmada!</h3>
+                    <p className="text-muted-foreground text-sm mb-6">
+                      Sua missão espacial foi reservada com sucesso. Confira os detalhes no painel.
+                    </p>
+                    <div className="space-y-3">
+                      <Link href="/dashboard">
+                        <Button className="w-full gap-2">
+                          <Rocket className="h-4 w-4" />
+                          Ver no Dashboard
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setBookingSuccess(false)
+                          setDepartureDate("")
+                          setReturnDate("")
+                          setPassengers(1)
+                        }}
+                      >
+                        Nova Reserva
+                      </Button>
+                    </div>
                   </div>
-
-                  <Separator className="mb-6" />
-
-                  {/* Availability */}
-                  {nextDisponibilidade ? (
-                    <div className="space-y-4 mb-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-4 w-4" />
-                          <span>Próximo lançamento</span>
-                        </div>
-                        <span className="font-semibold text-sm">
-                          {formatDate(nextDisponibilidade.data_partida)}
-                        </span>
+                ) : (
+                  /* Booking form */
+                  <div className="glass rounded-2xl p-6">
+                    {/* Price */}
+                    <div className="mb-5">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold">{formatPrice(destination.price)}</span>
+                        <span className="text-muted-foreground text-sm">USD / pessoa</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Users className="h-4 w-4" />
-                          <span>Vagas disponíveis</span>
+                      {destination.rating > 0 && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="text-sm font-medium">{destination.rating.toFixed(1)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({destination.reviewCount} avaliações)
+                          </span>
                         </div>
-                        <span className="font-semibold">
-                          {nextDisponibilidade.vagas_disponiveis} de{" "}
-                          {nextDisponibilidade.vagas_totais}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                          style={{
-                            width: `${((nextDisponibilidade.vagas_totais - nextDisponibilidade.vagas_disponiveis) / nextDisponibilidade.vagas_totais) * 100}%`,
+                      )}
+                    </div>
+
+                    <Separator className="mb-5" />
+
+                    <div className="space-y-4">
+                      {/* Departure date */}
+                      <div>
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          Data de Partida
+                        </label>
+                        <input
+                          type="date"
+                          value={departureDate}
+                          min={today()}
+                          onChange={(e) => {
+                            setDepartureDate(e.target.value)
+                            if (returnDate && returnDate <= e.target.value) setReturnDate("")
                           }}
+                          className="w-full h-10 px-3 rounded-lg bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
                         />
                       </div>
-                      {nextDisponibilidade.vagas_disponiveis <= 3 && (
-                        <p className="text-xs text-destructive">Últimas vagas! Reserve agora.</p>
-                      )}
-                    </div>
-                  ) : destination.maxCapacity > 0 ? (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>Capacidade: {destination.maxCapacity} passageiros</span>
+
+                      {/* Return date */}
+                      <div>
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          Data de Retorno
+                        </label>
+                        <input
+                          type="date"
+                          value={returnDate}
+                          min={departureDate ? minReturn(departureDate) : today()}
+                          disabled={!departureDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="w-full h-10 px-3 rounded-lg bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Passengers */}
+                      <div>
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                          <Users className="h-3.5 w-3.5" />
+                          Passageiros
+                        </label>
+                        <div className="flex items-center justify-between h-10 px-3 rounded-lg bg-card border border-border">
+                          <button
+                            onClick={() => setPassengers((p) => Math.max(1, p - 1))}
+                            disabled={passengers <= 1}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="font-semibold text-sm">
+                            {passengers} {passengers === 1 ? "adulto" : "adultos"}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setPassengers((p) => Math.min(destination.maxCapacity || 10, p + 1))
+                            }
+                            disabled={passengers >= (destination.maxCapacity || 10)}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  ) : null}
 
-                  {/* CTA */}
-                  <div className="space-y-3">
-                    {bookingMsg ? (
-                      <div
-                        className={cn(
-                          "p-3 rounded-lg text-sm text-center",
-                          bookingMsg.includes("sucesso")
-                            ? "bg-green-500/20 text-green-400"
-                            : "bg-destructive/20 text-destructive"
-                        )}
+                    {/* Price breakdown */}
+                    {passengers > 1 && (
+                      <div className="mt-4 p-3 rounded-xl bg-secondary/50 text-sm">
+                        <div className="flex justify-between text-muted-foreground mb-1">
+                          <span>{formatPrice(destination.price)} × {passengers}</span>
+                          <span>{formatPrice(totalPrice)}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold border-t border-border/50 pt-2 mt-2">
+                          <span>Total</span>
+                          <span className="text-primary">{formatPrice(totalPrice)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error */}
+                    {bookingError && (
+                      <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                        {bookingError}
+                      </div>
+                    )}
+
+                    {/* CTA */}
+                    <div className="mt-5 space-y-3">
+                      <Button
+                        size="lg"
+                        className="w-full font-semibold"
+                        onClick={handleReservar}
+                        disabled={booking}
                       >
-                        {bookingMsg}
-                      </div>
-                    ) : null}
-
-                    <Button
-                      size="lg"
-                      className="w-full"
-                      onClick={handleReservar}
-                      disabled={booking}
-                    >
-                      {booking ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Reservando...
-                        </>
-                      ) : user ? (
-                        "Reservar Agora"
-                      ) : (
-                        "Entrar para Reservar"
-                      )}
-                    </Button>
-
-                    <Link href="/assistente" className="block">
-                      <Button variant="outline" size="lg" className="w-full gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        Perguntar à IA
+                        {booking ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Reservando...
+                          </>
+                        ) : user ? (
+                          "Reservar Agora"
+                        ) : (
+                          "Entrar para Reservar"
+                        )}
                       </Button>
-                    </Link>
-                  </div>
 
-                  <div className="mt-6 pt-6 border-t border-border/50">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Check className="h-4 w-4" />
-                      <span>Cancelamento gratuito até 30 dias antes</span>
+                      <Link href="/assistente" className="block">
+                        <Button variant="outline" size="lg" className="w-full gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          Perguntar à ARIA
+                        </Button>
+                      </Link>
+                    </div>
+
+                    {/* Trust signals */}
+                    <div className="mt-5 pt-5 border-t border-border/50 space-y-2">
+                      {[
+                        "Cancelamento gratuito até 30 dias antes",
+                        "Pagamento seguro e criptografado",
+                        "Suporte 24/7 dedicado",
+                      ].map((item) => (
+                        <div key={item} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Check className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                          {item}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
               </motion.div>
             </div>
           </div>

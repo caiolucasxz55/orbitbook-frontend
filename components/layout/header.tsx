@@ -12,8 +12,7 @@ import { useAuth } from "@/contexts/auth-context"
 const navLinks = [
   { href: "/", label: "Início" },
   { href: "/explorar", label: "Catálogo" },
-  { href: "/comparar", label: "Comparar" },
-  { href: "/assistente", label: "Assistente" },
+  { href: "/assistente", label: "Assistente IA" },
 ]
 
 export function Header() {

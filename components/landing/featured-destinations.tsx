@@ -15,14 +15,15 @@ export function FeaturedDestinations() {
   useEffect(() => {
     api.destinos
       .list()
-      .then((dests) =>
-        setDestinations(
-          dests
-            .map(apiDestinoToDestination)
-            .filter((d) => d.featured)
-            .slice(0, 8)
-        )
-      )
+      .then((dests) => {
+        const converted = dests.map(apiDestinoToDestination)
+        // Show featured first, then fill up to 8 with highest-rated
+        const featured = converted.filter((d) => d.featured)
+        const rest = converted
+          .filter((d) => !d.featured)
+          .sort((a, b) => b.rating - a.rating)
+        setDestinations([...featured, ...rest].slice(0, 8))
+      })
       .catch(() => {})
   }, [])
 
@@ -39,6 +40,9 @@ export function FeaturedDestinations() {
           className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10"
         >
           <div>
+            <p className="text-sm text-primary font-medium mb-2 tracking-wide uppercase">
+              Destaques
+            </p>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
               Destinos em Destaque
             </h2>
@@ -47,7 +51,7 @@ export function FeaturedDestinations() {
             </p>
           </div>
           <Link href="/explorar">
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2 shrink-0">
               Ver Todos
               <ArrowRight className="h-4 w-4" />
             </Button>

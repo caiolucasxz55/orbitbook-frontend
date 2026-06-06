@@ -6,30 +6,28 @@ import Link from "next/link"
 import {
   Rocket,
   Calendar,
-  Clock,
-  Award,
   Star,
   ChevronRight,
   LogOut,
   Loader2,
   User,
+  MapPin,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { api, type ApiReserva, type ApiDestino } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const statusColors: Record<string, string> = {
-  PENDENTE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  CONFIRMADO: "bg-green-500/20 text-green-400 border-green-500/30",
-  EM_MISSAO: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  CONCLUIDO: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  CANCELADO: "bg-red-500/20 text-red-400 border-red-500/30",
+  PENDENTE: "bg-yellow-500/15 text-yellow-400 border-yellow-500/25",
+  CONFIRMADO: "bg-green-500/15 text-green-400 border-green-500/25",
+  EM_MISSAO: "bg-blue-500/15 text-blue-400 border-blue-500/25",
+  CONCLUIDO: "bg-primary/15 text-primary border-primary/25",
+  CANCELADO: "bg-destructive/15 text-destructive border-destructive/25",
 }
 
 const statusLabels: Record<string, string> = {
@@ -38,18 +36,6 @@ const statusLabels: Record<string, string> = {
   EM_MISSAO: "Em Missão",
   CONCLUIDO: "Concluída",
   CANCELADO: "Cancelada",
-}
-
-const planColors: Record<string, string> = {
-  EXPLORER: "from-blue-500 to-cyan-500",
-  PIONEER: "from-purple-500 to-pink-500",
-  ASTRONAUT: "from-amber-500 to-orange-500",
-}
-
-const planBenefits: Record<string, string[]> = {
-  EXPLORER: ["Acesso antecipado a novos destinos", "5% de desconto em reservas", "Suporte prioritário"],
-  PIONEER: ["Acesso antecipado a novos destinos", "10% de desconto em reservas", "Suporte VIP", "Sala de espera exclusiva"],
-  ASTRONAUT: ["Acesso antecipado a novos destinos", "15% de desconto em reservas", "Concierge dedicado", "Upgrades gratuitos", "Eventos exclusivos"],
 }
 
 const formatPrice = (price: number) =>
@@ -62,7 +48,7 @@ const formatPrice = (price: number) =>
 const formatDate = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString("pt-BR", {
     day: "numeric",
-    month: "long",
+    month: "short",
     year: "numeric",
   })
 
@@ -102,10 +88,12 @@ export default function DashboardPage() {
       <main className="min-h-screen">
         <Header />
         <div className="flex flex-col items-center justify-center h-[80vh] gap-6 text-center px-4">
-          <User className="h-16 w-16 text-muted-foreground opacity-40" />
+          <div className="w-20 h-20 rounded-2xl bg-card border border-border flex items-center justify-center">
+            <User className="h-10 w-10 text-muted-foreground opacity-40" />
+          </div>
           <div>
             <h1 className="text-2xl font-bold mb-2">Acesse sua conta</h1>
-            <p className="text-muted-foreground">Faça login para ver seu dashboard e reservas.</p>
+            <p className="text-muted-foreground">Faça login para ver seu dashboard e suas reservas.</p>
           </div>
           <Button onClick={openAuthModal}>Entrar / Criar Conta</Button>
         </div>
@@ -119,7 +107,6 @@ export default function DashboardPage() {
   )
   const past = reservas.filter((r) => ["CONCLUIDO", "CANCELADO"].includes(r.status))
   const completedCount = reservas.filter((r) => r.status === "CONCLUIDO").length
-  const hasPlan = user.plano !== "NENHUM"
 
   function BookingCard({ reserva, compact = false }: { reserva: ApiReserva; compact?: boolean }) {
     const destino = destinos.get(reserva.destino_id)
@@ -127,30 +114,30 @@ export default function DashboardPage() {
 
     if (compact) {
       return (
-        <div className="glass rounded-xl p-4">
+        <div className="glass rounded-xl p-4 transition-all hover:border-primary/30">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Rocket className="h-6 w-6 text-primary" />
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Rocket className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge
-                  variant="outline"
-                  className={cn("text-xs", statusColors[reserva.status])}
-                >
+              <div className="flex items-center gap-2 mb-0.5">
+                <Badge variant="outline" className={cn("text-xs", statusColors[reserva.status])}>
                   {statusLabels[reserva.status]}
                 </Badge>
               </div>
-              <h4 className="font-semibold truncate">
+              <h4 className="font-semibold text-sm truncate">
                 {destino?.nome || `Destino #${reserva.destino_id}`}
               </h4>
-              <p className="text-sm text-muted-foreground">
-                {formatDate(reserva.criado_em)} • {reserva.num_passageiros} passageiro
-                {reserva.num_passageiros > 1 ? "s" : ""}
-              </p>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {formatDate(reserva.departure_date)}
+                </span>
+                <span>{reserva.num_passageiros} pax</span>
+              </div>
             </div>
-            <div className="text-right hidden sm:block">
-              <div className="font-semibold">{formatPrice(reserva.valor_total)}</div>
+            <div className="text-right hidden sm:block shrink-0">
+              <div className="font-semibold text-sm">{formatPrice(Number(reserva.valor_total))}</div>
               <div className="text-xs text-muted-foreground font-mono">{missionCode}</div>
             </div>
           </div>
@@ -159,44 +146,43 @@ export default function DashboardPage() {
     }
 
     return (
-      <div className="glass rounded-2xl p-6 gradient-border">
-        <div className="flex flex-col sm:flex-row gap-6">
-          <div className="w-full sm:w-48 h-32 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Rocket className="h-12 w-12 text-primary/50" />
+      <div className="glass rounded-2xl p-5 gradient-border transition-all hover:border-primary/30">
+        <div className="flex flex-col sm:flex-row gap-5">
+          <div className="w-full sm:w-44 h-28 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Rocket className="h-10 w-10 text-primary/50" />
           </div>
           <div className="flex-1">
             <div className="flex items-start justify-between mb-2">
               <div>
-                <Badge
-                  variant="outline"
-                  className={cn("mb-2", statusColors[reserva.status])}
-                >
+                <Badge variant="outline" className={cn("mb-2", statusColors[reserva.status])}>
                   {statusLabels[reserva.status]}
                 </Badge>
-                <h3 className="text-lg font-semibold">
+                <h3 className="text-base font-semibold">
                   {destino?.nome || `Destino #${reserva.destino_id}`}
                 </h3>
               </div>
             </div>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {formatDate(reserva.criado_em)}
+                <span>Partida: {formatDate(reserva.departure_date)}</span>
               </div>
-              {destino?.duracao && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {destino.duracao}h
-                </div>
-              )}
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-4 w-4" />
+                <span>Retorno: {formatDate(reserva.return_date)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-4 w-4" />
+                <span>{reserva.num_passageiros} passageiro{reserva.num_passageiros > 1 ? "s" : ""}</span>
+              </div>
             </div>
             <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <span className="text-muted-foreground">Código da missão: </span>
-                <span className="font-mono font-semibold">{missionCode}</span>
+              <div>
+                <span className="text-sm text-muted-foreground">Código: </span>
+                <span className="font-mono text-sm font-semibold">{missionCode}</span>
               </div>
               <Link href={`/destino/${reserva.destino_id}`}>
-                <Button variant="ghost" size="sm" className="gap-1">
+                <Button variant="ghost" size="sm" className="gap-1 h-8">
                   Ver destino
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -214,64 +200,50 @@ export default function DashboardPage() {
 
       <div className="pt-24 pb-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Profile Header */}
+          {/* Profile Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
             className="glass rounded-2xl p-6 sm:p-8 mb-8"
           >
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <User className="h-12 w-12 text-primary/60" />
-                </div>
-                {hasPlan && (
-                  <div
-                    className={cn(
-                      "absolute -bottom-2 -right-2 w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center",
-                      planColors[user.plano]
-                    )}
-                  >
-                    <Award className="h-4 w-4 text-white" />
-                  </div>
-                )}
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <User className="h-10 w-10 text-primary/70" />
               </div>
 
               <div className="flex-1">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-1">
                   <h1 className="text-2xl sm:text-3xl font-bold">{user.nome}</h1>
-                  {hasPlan && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "bg-gradient-to-r text-white border-0 w-fit",
-                        planColors[user.plano]
-                      )}
-                    >
-                      OrbitPass {user.plano.charAt(0) + user.plano.slice(1).toLowerCase()}
+                  {user.role && (
+                    <Badge variant="outline" className="w-fit text-xs">
+                      {user.role}
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground mb-4">{user.email}</p>
+                <p className="text-muted-foreground text-sm mb-5">{user.email}</p>
                 <div className="flex flex-wrap gap-6">
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">{completedCount}</div>
-                    <div className="text-sm text-muted-foreground">Missões Concluídas</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">{reservas.length}</div>
-                    <div className="text-sm text-muted-foreground">Total de Reservas</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">{upcoming.length}</div>
-                    <div className="text-sm text-muted-foreground">Próximas Viagens</div>
-                  </div>
+                  {[
+                    { value: completedCount, label: "Missões Concluídas" },
+                    { value: reservas.length, label: "Total de Reservas" },
+                    { value: upcoming.length, label: "Próximas Viagens" },
+                  ].map(({ value, label }) => (
+                    <div key={label}>
+                      <div className="text-2xl font-bold text-gradient">{value}</div>
+                      <div className="text-xs text-muted-foreground">{label}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <Button variant="outline" size="icon" onClick={logout} title="Sair">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={logout}
+                className="gap-2 shrink-0"
+              >
                 <LogOut className="h-4 w-4" />
+                Sair
               </Button>
             </div>
           </motion.div>
@@ -284,13 +256,13 @@ export default function DashboardPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.1 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
                 >
-                  <h2 className="text-xl font-bold mb-4">Próximas Missões</h2>
+                  <h2 className="text-lg font-semibold mb-4">Próximas Missões</h2>
                   {loadingData ? (
                     <div className="space-y-4">
                       {[1, 2].map((i) => (
-                        <div key={i} className="h-40 bg-card rounded-2xl animate-pulse" />
+                        <div key={i} className="h-36 bg-card rounded-2xl animate-pulse border border-border" />
                       ))}
                     </div>
                   ) : (
@@ -307,40 +279,40 @@ export default function DashboardPage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
               >
-                <Tabs defaultValue="past">
-                  <TabsList className="bg-card/50 mb-4">
+                <Tabs defaultValue={past.length > 0 ? "past" : "all"}>
+                  <TabsList className="bg-card/50 border border-border/50 mb-4">
                     <TabsTrigger value="past">
-                      Missões Anteriores {past.length > 0 && `(${past.length})`}
+                      Anteriores{past.length > 0 ? ` (${past.length})` : ""}
                     </TabsTrigger>
                     <TabsTrigger value="all">
-                      Todas as Reservas {reservas.length > 0 && `(${reservas.length})`}
+                      Todas{reservas.length > 0 ? ` (${reservas.length})` : ""}
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="past" className="space-y-4">
+                  <TabsContent value="past" className="space-y-3">
                     {loadingData ? (
-                      <div className="h-32 bg-card rounded-xl animate-pulse" />
+                      <div className="h-28 bg-card rounded-xl animate-pulse border border-border" />
                     ) : past.length > 0 ? (
                       past.map((r) => <BookingCard key={r.id} reserva={r} compact />)
                     ) : (
                       <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
-                        <Rocket className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                        <p>Nenhuma missão anterior ainda.</p>
+                        <Rocket className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">Nenhuma missão anterior ainda.</p>
                       </div>
                     )}
                   </TabsContent>
 
-                  <TabsContent value="all" className="space-y-4">
+                  <TabsContent value="all" className="space-y-3">
                     {loadingData ? (
-                      <div className="h-32 bg-card rounded-xl animate-pulse" />
+                      <div className="h-28 bg-card rounded-xl animate-pulse border border-border" />
                     ) : reservas.length > 0 ? (
                       reservas.map((r) => <BookingCard key={r.id} reserva={r} compact />)
                     ) : (
                       <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
-                        <Rocket className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                        <p>Nenhuma reserva encontrada.</p>
+                        <Rocket className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">Nenhuma reserva encontrada.</p>
                         <Link href="/explorar">
                           <Button variant="outline" size="sm" className="mt-4">
                             Explorar Destinos
@@ -354,67 +326,48 @@ export default function DashboardPage() {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-6">
-              {/* OrbitPass Card */}
-              {hasPlan && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
-                  className={cn(
-                    "rounded-2xl p-6 text-white bg-gradient-to-br",
-                    planColors[user.plano]
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <Rocket className="h-8 w-8" />
-                    <span className="text-sm opacity-80">OrbitPass</span>
-                  </div>
-                  <h3 className="text-2xl font-bold mb-1">
-                    {user.plano.charAt(0) + user.plano.slice(1).toLowerCase()}
-                  </h3>
-                  <p className="text-sm opacity-80 mb-6">Plano ativo</p>
-                  <Separator className="bg-white/20 mb-4" />
-                  <ul className="space-y-2">
-                    {(planBenefits[user.plano] || []).map((benefit, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <Star className="h-3 w-3" />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                </motion.div>
-              )}
-
+            <div className="space-y-5">
               {/* Quick Actions */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
                 className="glass rounded-2xl p-6"
               >
                 <h3 className="font-semibold mb-4">Ações Rápidas</h3>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <Link href="/explorar" className="block">
-                    <Button variant="outline" className="w-full justify-start gap-2">
+                    <Button variant="outline" className="w-full justify-start gap-2 h-9">
                       <Rocket className="h-4 w-4" />
                       Explorar Destinos
                     </Button>
                   </Link>
                   <Link href="/assistente" className="block">
-                    <Button variant="outline" className="w-full justify-start gap-2">
+                    <Button variant="outline" className="w-full justify-start gap-2 h-9">
                       <Star className="h-4 w-4" />
-                      Falar com Assistente IA
-                    </Button>
-                  </Link>
-                  <Link href="/comparar" className="block">
-                    <Button variant="outline" className="w-full justify-start gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Comparar Destinos
+                      Falar com ARIA
                     </Button>
                   </Link>
                 </div>
               </motion.div>
+
+              {/* Stats card */}
+              {completedCount > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className="rounded-2xl p-6 bg-linear-to-br from-primary/20 to-accent/20 border border-primary/20"
+                >
+                  <Rocket className="h-7 w-7 text-primary mb-4" />
+                  <div className="text-3xl font-bold mb-1">{completedCount}</div>
+                  <p className="text-sm text-muted-foreground">
+                    {completedCount === 1
+                      ? "Missão espacial concluída"
+                      : "Missões espaciais concluídas"}
+                  </p>
+                </motion.div>
+              )}
             </div>
           </div>
         </div>

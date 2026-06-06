@@ -25,49 +25,38 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
-// --- API Types ---
+// --- API Types (match DDL v3 / schemas.py) ---
 
 export interface ApiDestino {
   id: number
   nome: string
-  tipo: "SUBORBITAL" | "LEO" | "LUNAR" | "MARTE"
-  descricao?: string
-  duracao?: number
-  altitude?: number
-  capacidade_max?: number
+  tipo?: string
+  descricao: string
+  capacidade_max: number
   preco_base: number
-  nivel_risco?: "BAIXO" | "MODERADO" | "ALTO" | "MUITO_ALTO"
-  requisitos?: string
-  operadora?: string
-  badge?: "POPULAR" | "NOVO" | "ULTIMAS_VAGAS" | "EXCLUSIVO"
+  distance_km: number
+  image_url: string
   ativo: number
-  avaliacao: { media: number; total: number }
-}
-
-export interface ApiDisponibilidade {
-  id: number
-  destino_id: number
-  data_partida: string
-  vagas_totais: number
-  vagas_disponiveis: number
+  avaliacao?: { media: number; total: number }
 }
 
 export interface ApiReserva {
   id: number
   usuario_id: number
   destino_id: number
-  disponibilidade_id?: number
+  departure_date: string
+  return_date: string
   num_passageiros: number
   valor_total: number
   status: "PENDENTE" | "CONFIRMADO" | "EM_MISSAO" | "CONCLUIDO" | "CANCELADO"
   criado_em: string
-  atualizado_em: string
 }
 
 export interface ApiAvaliacao {
   id: number
-  usuario_id: number
-  destino_id: number
+  booking_id: number
+  usuario_id?: number
+  destino_id?: number
   nota: number
   comentario?: string
   criado_em: string
@@ -77,8 +66,7 @@ export interface ApiUsuario {
   id: number
   nome: string
   email: string
-  role: "CLIENTE" | "ADMIN"
-  plano: "NENHUM" | "EXPLORER" | "PIONEER" | "ASTRONAUT"
+  role?: string
   criado_em: string
 }
 
@@ -90,33 +78,30 @@ export interface ApiToken {
 
 // --- Adapters ---
 
-const categoryMap: Record<ApiDestino["tipo"], Destination["category"]> = {
-  SUBORBITAL: "suborbital",
-  LEO: "leo",
-  LUNAR: "lunar",
-  MARTE: "mars",
-}
-
-const riskMap: Record<string, Destination["riskLevel"]> = {
-  BAIXO: "Baixo",
-  MODERADO: "Moderado",
-  ALTO: "Alto",
-  MUITO_ALTO: "Extremo",
-}
-
-const badgeMap: Record<string, Badge> = {
-  POPULAR: { type: "popular", label: "Popular" },
-  NOVO: { type: "new", label: "Novo" },
-  ULTIMAS_VAGAS: { type: "lastSeats", label: "Últimas Vagas" },
-  EXCLUSIVO: { type: "exclusive", label: "Exclusivo" },
+function inferCategory(tipo?: string): Destination["category"] {
+  const t = (tipo || "").toUpperCase()
+  if (t.includes("SUBORBITAL")) return "suborbital"
+  if (t.includes("LEO") || t.includes("ORBITAL") || t.includes("TERRESTRE")) return "leo"
+  if (t.includes("LUNAR") || t.includes("LUA")) return "lunar"
+  if (t.includes("MARTE") || t.includes("MARS")) return "mars"
+  if (t.includes("DEEP") || t.includes("PROFUNDO")) return "deepspace"
+  if (t.includes("TRAIN") || t.includes("TREIN")) return "training"
+  return "suborbital"
 }
 
 export function apiDestinoToDestination(d: ApiDestino): Destination {
-  const specs: TechnicalSpec[] = []
-  if (d.altitude) specs.push({ label: "Altitude", value: `${d.altitude.toLocaleString("pt-BR")} km` })
-  if (d.duracao) specs.push({ label: "Duração", value: `${d.duracao}h` })
-  if (d.capacidade_max) specs.push({ label: "Capacidade máx.", value: `${d.capacidade_max} passageiros` })
-  if (d.operadora) specs.push({ label: "Operadora", value: d.operadora })
+  const specs: TechnicalSpec[] = [
+    { label: "Distância", value: `${Number(d.distance_km).toLocaleString("pt-BR")} km` },
+    { label: "Capacidade máx.", value: `${d.capacidade_max} passageiros` },
+    ...(d.tipo ? [{ label: "Tipo de missão", value: d.tipo }] : []),
+  ]
+
+  const badges: Badge[] = []
+  const rating = d.avaliacao?.media || 0
+  const reviews = d.avaliacao?.total || 0
+  if (reviews === 0) badges.push({ type: "new", label: "Novo" })
+  else if (rating >= 4.5) badges.push({ type: "popular", label: "Popular" })
+  if (d.capacidade_max <= 4) badges.push({ type: "exclusive", label: "Exclusivo" })
 
   return {
     id: d.id.toString(),
@@ -125,30 +110,30 @@ export function apiDestinoToDestination(d: ApiDestino): Destination {
     tagline: d.descricao?.split(".")[0] || d.nome,
     description: d.descricao || "",
     longDescription: d.descricao || "",
-    price: d.preco_base,
+    price: Number(d.preco_base),
     currency: "USD",
-    duration: d.duracao ? `${d.duracao}h` : "A definir",
-    durationDays: d.duracao ? Math.ceil(d.duracao / 24) : 0,
-    distance: d.altitude ? `${d.altitude.toLocaleString("pt-BR")} km` : "",
-    riskLevel: riskMap[d.nivel_risco || ""] || "Moderado",
-    operator: d.operadora || "Operadora Espacial",
+    duration: "",
+    durationDays: 0,
+    distance: `${Number(d.distance_km).toLocaleString("pt-BR")} km`,
+    riskLevel: "Moderado",
+    operator: "",
     operatorLogo: "",
-    rating: d.avaliacao?.media || 0,
-    reviewCount: d.avaliacao?.total || 0,
-    availability: d.capacidade_max || 0,
-    maxCapacity: d.capacidade_max || 0,
-    category: categoryMap[d.tipo] || "suborbital",
-    badges: d.badge ? [badgeMap[d.badge]] : [],
-    requirements: d.requisitos ? d.requisitos.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    rating,
+    reviewCount: reviews,
+    availability: d.capacidade_max,
+    maxCapacity: d.capacidade_max,
+    category: inferCategory(d.tipo),
+    badges,
+    requirements: [],
     highlights: [],
     included: [],
     notIncluded: [],
     technicalSpecs: specs,
     gallery: [],
-    heroImage: `/placeholder.svg?height=600&width=1200`,
+    heroImage: d.image_url || `/placeholder.svg?height=600&width=1200`,
     launchSite: "Base de Lançamento",
     nextLaunch: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    featured: d.badge === "POPULAR" || d.badge === "EXCLUSIVO",
+    featured: rating >= 4 || reviews >= 3,
   }
 }
 
@@ -179,7 +164,6 @@ export const api = {
   destinos: {
     list: (params?: {
       tipo?: string
-      badge?: string
       preco_min?: number
       preco_max?: number
       busca?: string
@@ -198,9 +182,6 @@ export const api = {
     },
 
     get: (id: number) => request<ApiDestino>(`/destinos/${id}`),
-
-    disponibilidades: (id: number) =>
-      request<ApiDisponibilidade[]>(`/destinos/${id}/disponibilidades`),
   },
 
   reservas: {
@@ -210,7 +191,8 @@ export const api = {
 
     create: (data: {
       destino_id: number
-      disponibilidade_id?: number
+      departure_date: string
+      return_date: string
       num_passageiros?: number
     }) => request<ApiReserva>("/reservas/", { method: "POST", body: JSON.stringify(data) }),
 
@@ -227,7 +209,7 @@ export const api = {
     listByDestino: (destinoId: number) =>
       request<ApiAvaliacao[]>(`/avaliacoes/destino/${destinoId}`),
 
-    create: (data: { destino_id: number; nota: number; comentario?: string }) =>
+    create: (data: { booking_id: number; nota: number; comentario?: string }) =>
       request<ApiAvaliacao>("/avaliacoes/", { method: "POST", body: JSON.stringify(data) }),
 
     delete: (id: number) => request<null>(`/avaliacoes/${id}`, { method: "DELETE" }),
@@ -235,9 +217,6 @@ export const api = {
 
   usuarios: {
     get: (id: number) => request<ApiUsuario>(`/usuarios/${id}`),
-
-    updatePlano: (id: number, plano: ApiUsuario["plano"]) =>
-      request<ApiUsuario>(`/usuarios/${id}/plano?plano=${plano}`, { method: "PATCH" }),
   },
 
   ai: {

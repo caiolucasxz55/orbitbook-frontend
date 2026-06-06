@@ -127,4 +127,24 @@
   .text-gradient {
     @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
   }
+
+  .glass {
+    @apply bg-card/70 backdrop-blur-md border border-border/50;
+  }
+
+  .gradient-border {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--color-card), var(--color-card)) padding-box,
+      linear-gradient(135deg, var(--color-primary), var(--color-accent)) border-box;
+  }
+
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -361,9 +361,9 @@ export default function AssistentePage() {
                   Ver Destinos
                 </Button>
               </Link>
-              <Link href="/comparar">
+              <Link href="/dashboard">
                 <Button variant="outline" size="sm" className="gap-2">
-                  Comparar Opções
+                  Minhas Reservas
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
