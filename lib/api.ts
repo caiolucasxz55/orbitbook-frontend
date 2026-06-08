@@ -7,6 +7,13 @@ export function getToken(): string | null {
   return localStorage.getItem("orbit_token")
 }
 
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
@@ -19,13 +26,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(error.detail || `Erro ${res.status}`)
+    throw new ApiError(res.status, error.detail || `Erro ${res.status}`)
   }
   if (res.status === 204) return null as T
   return res.json()
 }
 
-// --- API Types (match DDL v3 / schemas.py) ---
+// --- API Types ---
 
 export interface ApiDestino {
   id: number
@@ -38,6 +45,27 @@ export interface ApiDestino {
   image_url: string
   ativo: number
   avaliacao?: { media: number; total: number }
+}
+
+export interface ApiDestinoPageOut {
+  items: ApiDestino[]
+  total: number
+  page: number
+  pages: number
+  limit: number
+}
+
+export interface ApiDestinoRecomendado {
+  id: number
+  nome: string
+  tipo?: string
+  descricao: string
+  preco_base: number
+  distance_km: number
+  image_url: string
+  capacidade_max: number
+  avaliacao?: { media: number; total: number }
+  ativo: number
 }
 
 export interface ApiReserva {
@@ -76,6 +104,48 @@ export interface ApiToken {
   usuario: ApiUsuario
 }
 
+// --- Image mapping ---
+
+const nameImageMap: Array<[string[], string]> = [
+  [["aurora"], "/destinations/aurora-orbital-hotel.jpg"],
+  [["tiangong"], "/destinations/tiangong-station.jpg"],
+  [["selene"], "/destinations/selene-resort.jpg"],
+  [["artemis"], "/destinations/artemis-expedition.jpg"],
+  [["apollo"], "/destinations/apollo-moon-base.jpg"],
+  [["gateway", "lunar gateway"], "/destinations/lunar-gateway-station.jpg"],
+  [["ares prime", "ares"], "/destinations/ares-prime-colony.jpg"],
+  [["europa"], "/destinations/europa-deep-aqua.jpg"],
+  [["helios"], "/destinations/helios-solar-station.jpg"],
+  [["kraken", "titan"], "/destinations/kraken-titan-colony.jpg"],
+  [["celestial hub", "celestial"], "/destinations/celestial-hub.jpg"],
+  [["dyson"], "/destinations/dyson-sphere.jpg"],
+  [["stanford", "torus"], "/destinations/stanford-torus.jpg"],
+  [["asteroid", "oasis"], "/destinations/asteroid-oasis.jpg"],
+  [["jupiter"], "/destinations/jupiter-cruise.jpg"],
+  [["venus"], "/destinations/venus-cloud-city.jpg"],
+  [["oneill", "o'neill", "cylinder", "cilindro"], "/destinations/oneill-cylinder.jpg"],
+  [["marte", "mars base", "mars alpha"], "/destinations/mars-base-alpha.jpg"],
+  [["rover", "mare serenitat"], "/destinations/lunar-rover-tour.jpg"],
+  [["greenhouse", "estufa", "fazenda"], "/destinations/mars-greenhouse.jpg"],
+]
+
+const categoryFallbacks: Record<string, string> = {
+  leo: "/destinations/aurora-orbital-hotel.jpg",
+  lunar: "/destinations/selene-resort.jpg",
+  mars: "/destinations/mars-base-alpha.jpg",
+  deepspace: "/destinations/celestial-hub.jpg",
+  suborbital: "/destinations/space-hotel-suite.jpg",
+  training: "/destinations/artemis-expedition.jpg",
+}
+
+function getLocalImage(nome: string, category: string): string {
+  const n = nome.toLowerCase()
+  for (const [keywords, img] of nameImageMap) {
+    if (keywords.some((kw) => n.includes(kw))) return img
+  }
+  return categoryFallbacks[category] || "/destinations/aurora-orbital-hotel.jpg"
+}
+
 // --- Adapters ---
 
 function inferCategory(tipo?: string): Destination["category"] {
@@ -90,6 +160,8 @@ function inferCategory(tipo?: string): Destination["category"] {
 }
 
 export function apiDestinoToDestination(d: ApiDestino): Destination {
+  const category = inferCategory(d.tipo)
+
   const specs: TechnicalSpec[] = [
     { label: "Distância", value: `${Number(d.distance_km).toLocaleString("pt-BR")} km` },
     { label: "Capacidade máx.", value: `${d.capacidade_max} passageiros` },
@@ -102,6 +174,8 @@ export function apiDestinoToDestination(d: ApiDestino): Destination {
   if (reviews === 0) badges.push({ type: "new", label: "Novo" })
   else if (rating >= 4.5) badges.push({ type: "popular", label: "Popular" })
   if (d.capacidade_max <= 4) badges.push({ type: "exclusive", label: "Exclusivo" })
+
+  const heroImage = d.image_url || getLocalImage(d.nome, category)
 
   return {
     id: d.id.toString(),
@@ -122,7 +196,7 @@ export function apiDestinoToDestination(d: ApiDestino): Destination {
     reviewCount: reviews,
     availability: d.capacidade_max,
     maxCapacity: d.capacidade_max,
-    category: inferCategory(d.tipo),
+    category,
     badges,
     requirements: [],
     highlights: [],
@@ -130,7 +204,7 @@ export function apiDestinoToDestination(d: ApiDestino): Destination {
     notIncluded: [],
     technicalSpecs: specs,
     gallery: [],
-    heroImage: d.image_url || `/placeholder.svg?height=600&width=1200`,
+    heroImage,
     launchSite: "Base de Lançamento",
     nextLaunch: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     featured: rating >= 4 || reviews >= 3,
@@ -167,18 +241,20 @@ export const api = {
       preco_min?: number
       preco_max?: number
       busca?: string
+      page?: number
+      limit?: number
     }) => {
-      const query = params
-        ? "?" +
-          new URLSearchParams(
-            Object.fromEntries(
-              Object.entries(params)
-                .filter(([, v]) => v !== undefined)
-                .map(([k, v]) => [k, String(v)])
-            )
+      const merged = { limit: 50, ...params }
+      const query =
+        "?" +
+        new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(merged)
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, String(v)])
           )
-        : ""
-      return request<ApiDestino[]>(`/destinos/${query}`)
+        )
+      return request<ApiDestinoPageOut>(`/destinos/${query}`)
     },
 
     get: (id: number) => request<ApiDestino>(`/destinos/${id}`),
@@ -221,9 +297,11 @@ export const api = {
 
   ai: {
     chat: (messages: Array<{ role: string; content: string }>) =>
-      request<{ content: string; suggestions: string[]; recomendacao_id?: number }>(
-        "/ai/chat",
-        { method: "POST", body: JSON.stringify({ messages }) }
-      ),
+      request<{
+        content: string
+        suggestions: string[]
+        recomendacao_id?: number
+        destinos_recomendados: ApiDestinoRecomendado[]
+      }>("/ai/chat", { method: "POST", body: JSON.stringify({ messages }) }),
   },
 }

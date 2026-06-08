@@ -15,8 +15,8 @@ export function FeaturedDestinations() {
   useEffect(() => {
     api.destinos
       .list()
-      .then((dests) => {
-        const converted = dests.map(apiDestinoToDestination)
+      .then((page) => {
+        const converted = page.items.map(apiDestinoToDestination)
         // Show featured first, then fill up to 8 with highest-rated
         const featured = converted.filter((d) => d.featured)
         const rest = converted

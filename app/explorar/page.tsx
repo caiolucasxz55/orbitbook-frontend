@@ -12,9 +12,10 @@ import {
   Star,
   Telescope,
   Zap,
-  ChevronDown,
   LayoutGrid,
   LayoutList,
+  ChevronDown,
+  TrendingUp,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -42,12 +43,12 @@ import { cn } from "@/lib/utils"
 import type { Destination } from "@/types"
 
 const categories = [
-  { id: "all", name: "Todos", icon: Telescope },
-  { id: "suborbital", name: "Suborbital", icon: Zap },
-  { id: "leo", name: "Órbita Terrestre", icon: Globe },
-  { id: "lunar", name: "Lunar", icon: Moon },
-  { id: "mars", name: "Marte", icon: Rocket },
-  { id: "deepspace", name: "Espaço Profundo", icon: Star },
+  { id: "all", name: "Todos", icon: Telescope, color: "text-foreground" },
+  { id: "suborbital", name: "Suborbital", icon: Zap, color: "text-yellow-400" },
+  { id: "leo", name: "Órbita Terrestre", icon: Globe, color: "text-blue-400" },
+  { id: "lunar", name: "Lunar", icon: Moon, color: "text-gray-300" },
+  { id: "mars", name: "Marte", icon: Rocket, color: "text-orange-400" },
+  { id: "deepspace", name: "Espaço Profundo", icon: Star, color: "text-purple-400" },
 ]
 
 const priceRanges = [
@@ -79,7 +80,7 @@ export default function ExplorarPage() {
   useEffect(() => {
     api.destinos
       .list()
-      .then((dests) => setAllDestinations(dests.map(apiDestinoToDestination)))
+      .then((page) => setAllDestinations(page.items.map(apiDestinoToDestination)))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -140,37 +141,39 @@ export default function ExplorarPage() {
     setSearchQuery("")
   }
 
-  const skeletonCount = viewMode === "grid" ? 8 : 6
-
   return (
     <main className="min-h-screen bg-background">
       <Header />
 
-      {/* Page Header */}
-      <section className="pt-24 pb-10 border-b border-border/50">
+      {/* Hero header */}
+      <section className="relative pt-24 pb-10 overflow-hidden border-b border-border/40">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-primary/5 blur-3xl rounded-full pointer-events-none" />
+
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8"
+            className="mb-8"
           >
-            <div>
-              <p className="text-sm text-primary font-medium mb-2 tracking-wide uppercase">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <p className="text-sm text-primary font-medium tracking-wide uppercase">
                 Catálogo
               </p>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
-                Experiências Espaciais
-              </h1>
-              <p className="text-muted-foreground">
-                {loading
-                  ? "Carregando destinos..."
-                  : `${allDestinations.length} experiências disponíveis para reserva`}
-              </p>
             </div>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+              Experiências Espaciais
+            </h1>
+            <p className="text-muted-foreground">
+              {loading
+                ? "Carregando destinos..."
+                : `${allDestinations.length} experiências disponíveis para reserva`}
+            </p>
           </motion.div>
 
-          {/* Category Filter */}
+          {/* Category pills */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -192,7 +195,7 @@ export default function ExplorarPage() {
                       : "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : cat.color)} />
                   {cat.name}
                   {count > 0 && cat.id !== "all" && (
                     <span
@@ -224,10 +227,10 @@ export default function ExplorarPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Buscar por nome ou descrição..."
+                placeholder="Buscar por nome, destino ou descrição..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-card h-10"
+                className="pl-10 bg-card h-10 border-border/50 focus:border-primary/40"
               />
               {searchQuery && (
                 <button
@@ -241,7 +244,7 @@ export default function ExplorarPage() {
 
             {/* Price Range */}
             <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
-              <SelectTrigger className="w-full sm:w-44 bg-card h-10 gap-1">
+              <SelectTrigger className="w-full sm:w-44 bg-card h-10 border-border/50 gap-1">
                 <SelectValue placeholder="Preço" />
                 <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </SelectTrigger>
@@ -256,7 +259,7 @@ export default function ExplorarPage() {
 
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48 bg-card h-10 gap-1">
+              <SelectTrigger className="w-full sm:w-48 bg-card h-10 border-border/50 gap-1">
                 <SelectValue placeholder="Ordenar" />
                 <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </SelectTrigger>
@@ -272,7 +275,7 @@ export default function ExplorarPage() {
             {/* Filters sheet */}
             <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="h-10 gap-2 relative">
+                <Button variant="outline" className="h-10 gap-2 relative border-border/50">
                   <SlidersHorizontal className="h-4 w-4" />
                   <span className="hidden sm:inline">Filtros</span>
                   {activeFiltersCount > 0 && (
@@ -286,7 +289,6 @@ export default function ExplorarPage() {
                 <SheetHeader>
                   <SheetTitle>Filtros</SheetTitle>
                 </SheetHeader>
-
                 <div className="mt-6 space-y-6">
                   <div>
                     <h3 className="font-medium text-sm mb-3">Faixa de Preço</h3>
@@ -313,9 +315,7 @@ export default function ExplorarPage() {
                       ))}
                     </div>
                   </div>
-
                   <Separator />
-
                   <div>
                     <h3 className="font-medium text-sm mb-3">Categoria</h3>
                     <div className="space-y-1">
@@ -345,7 +345,6 @@ export default function ExplorarPage() {
                       })}
                     </div>
                   </div>
-
                   {activeFiltersCount > 0 && (
                     <>
                       <Separator />
@@ -359,7 +358,7 @@ export default function ExplorarPage() {
             </Sheet>
 
             {/* View mode toggle */}
-            <div className="hidden sm:flex items-center gap-1 rounded-lg border border-border p-1 bg-card">
+            <div className="hidden sm:flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-card">
               <button
                 onClick={() => setViewMode("grid")}
                 className={cn(
@@ -398,7 +397,7 @@ export default function ExplorarPage() {
                 {selectedCategory !== "all" && (
                   <Badge
                     variant="secondary"
-                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive"
+                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
                     onClick={() => setSelectedCategory("all")}
                   >
                     {categories.find((c) => c.id === selectedCategory)?.name}
@@ -408,7 +407,7 @@ export default function ExplorarPage() {
                 {selectedPriceRange !== "all" && (
                   <Badge
                     variant="secondary"
-                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive"
+                    className="gap-1 cursor-pointer text-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
                     onClick={() => setSelectedPriceRange("all")}
                   >
                     {priceRanges.find((r) => r.id === selectedPriceRange)?.label}
@@ -455,7 +454,7 @@ export default function ExplorarPage() {
                   : "grid-cols-1 sm:grid-cols-2"
               )}
             >
-              {Array.from({ length: skeletonCount }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
                   className="bg-card rounded-2xl border border-border animate-pulse"

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
@@ -31,7 +32,11 @@ const categoryLabels: Record<string, string> = {
   training: "Treinamento",
 }
 
+const FALLBACK_IMAGE = "/destinations/aurora-orbital-hotel.jpg"
+
 export function DestinationCard({ destination, index = 0, variant = "default" }: DestinationCardProps) {
+  const [imgSrc, setImgSrc] = useState(destination.heroImage || FALLBACK_IMAGE)
+
   const formatPrice = (price: number) => {
     if (price >= 1_000_000_000) return `$${(price / 1_000_000_000).toFixed(1)}B`
     if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(0)}M`
@@ -50,9 +55,10 @@ export function DestinationCard({ destination, index = 0, variant = "default" }:
           <div className="flex gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/30 transition-all hover:bg-card/80">
             <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
               <Image
-                src={destination.heroImage}
+                src={imgSrc}
                 alt={destination.name}
                 fill
+                onError={() => setImgSrc(FALLBACK_IMAGE)}
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
@@ -87,11 +93,12 @@ export function DestinationCard({ destination, index = 0, variant = "default" }:
       <Link href={`/destino/${destination.slug}`}>
         <div className="bg-card rounded-2xl overflow-hidden border border-border transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5">
           {/* Image */}
-          <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
+          <div className="relative aspect-16/10 overflow-hidden bg-secondary">
             <Image
-              src={destination.heroImage}
+              src={imgSrc}
               alt={destination.name}
               fill
+              onError={() => setImgSrc(FALLBACK_IMAGE)}
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             />

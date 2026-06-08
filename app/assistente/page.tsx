@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import Image from "next/image"
 import {
   Send,
   Sparkles,
@@ -11,6 +12,10 @@ import {
   User,
   ArrowRight,
   RefreshCw,
+  MapPin,
+  Users,
+  Star,
+  ExternalLink,
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -18,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/contexts/auth-context"
-import { api } from "@/lib/api"
+import { api, apiDestinoToDestination, ApiError, type ApiDestinoRecomendado } from "@/lib/api"
 import type { ChatMessage } from "@/types"
 
 const quickSuggestions = [
@@ -29,7 +34,11 @@ const quickSuggestions = [
   "Me fale sobre a missão para Marte",
 ]
 
-const welcomeMessage: ChatMessage = {
+interface ChatMessageExtended extends ChatMessage {
+  destinos_recomendados?: ApiDestinoRecomendado[]
+}
+
+const welcomeMessage: ChatMessageExtended = {
   id: "welcome",
   role: "assistant",
   content: `Olá! 👋 Sou ARIA, a assistente de IA do OrbitBook, especializada em ajudar você a encontrar a experiência espacial perfeita!
@@ -46,9 +55,104 @@ O que você gostaria de saber sobre turismo espacial?`,
   suggestions: ["Qual destino combina comigo?", "Opções para iniciantes", "Ver todos os destinos"],
 }
 
+function formatPrice(price: number) {
+  if (price >= 1_000_000_000) return `$${(price / 1_000_000_000).toFixed(1)}B`
+  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(0)}M`
+  return `$${(price / 1000).toFixed(0)}K`
+}
+
+const FALLBACK_IMAGE = "/destinations/aurora-orbital-hotel.jpg"
+
+function RecommendationCard({ d }: { d: ApiDestinoRecomendado }) {
+  const dest = apiDestinoToDestination({
+    id: d.id,
+    nome: d.nome,
+    tipo: d.tipo,
+    descricao: d.descricao,
+    capacidade_max: d.capacidade_max,
+    preco_base: d.preco_base,
+    distance_km: d.distance_km,
+    image_url: d.image_url,
+    ativo: d.ativo,
+    avaliacao: d.avaliacao,
+  })
+  const [imgSrc, setImgSrc] = useState(dest.heroImage || FALLBACK_IMAGE)
+
+  return (
+    <Link href={`/destino/${d.id}`}>
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/50 hover:border-primary/40 hover:bg-secondary/80 transition-all cursor-pointer group"
+      >
+        <div className="relative w-16 h-14 rounded-lg overflow-hidden shrink-0 bg-card">
+          <Image
+            src={imgSrc}
+            alt={d.nome}
+            fill
+            onError={() => setImgSrc(FALLBACK_IMAGE)}
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-1">
+            <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+              {d.nome}
+            </h4>
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{dest.tagline}</p>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="text-xs font-bold text-primary">{formatPrice(d.preco_base)}</span>
+            {d.distance_km && (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                {Number(d.distance_km).toLocaleString("pt-BR")} km
+              </span>
+            )}
+            {d.capacidade_max && (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <Users className="h-3 w-3" />
+                {d.capacidade_max} pax
+              </span>
+            )}
+            {d.avaliacao && d.avaliacao.total > 0 && (
+              <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {d.avaliacao.media.toFixed(1)}
+              </span>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  )
+}
+
+function RecommendationCards({ destinos }: { destinos: ApiDestinoRecomendado[] }) {
+  if (!destinos || destinos.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mt-3 grid gap-2"
+    >
+      <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+        <Sparkles className="h-3 w-3 text-primary" />
+        Destinos recomendados:
+      </p>
+      {destinos.map((d) => (
+        <RecommendationCard key={d.id} d={d} />
+      ))}
+    </motion.div>
+  )
+}
+
 export default function AssistentePage() {
   const { openAuthModal } = useAuth()
-  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage])
+  const [messages, setMessages] = useState<ChatMessageExtended[]>([welcomeMessage])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -63,7 +167,7 @@ export default function AssistentePage() {
   const sendMessage = async (content: string) => {
     if (!content.trim() || isTyping) return
 
-    const userMessage: ChatMessage = {
+    const userMessage: ChatMessageExtended = {
       id: `user-${Date.now()}`,
       role: "user",
       content: content.trim(),
@@ -88,42 +192,42 @@ export default function AssistentePage() {
           content: data.content,
           timestamp: new Date().toISOString(),
           suggestions: data.suggestions,
+          destinos_recomendados: data.destinos_recomendados,
         },
       ])
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : ""
-      const isAuthError =
-        msg.includes("401") ||
-        msg.toLowerCase().includes("token") ||
-        msg.toLowerCase().includes("authenticated")
+      let errorMsg =
+        "Desculpe, não foi possível conectar à API. Verifique se o servidor está rodando e tente novamente! 🚀"
+      let suggestions = ["Tentar novamente", "Ver destinos disponíveis"]
+      let triggerAuth = false
 
-      if (isAuthError) {
-        openAuthModal()
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            content:
-              "Para conversar com a ARIA você precisa estar logado. Faça login ou crie sua conta! 🚀",
-            timestamp: new Date().toISOString(),
-            suggestions: ["Criar conta", "Fazer login"],
-          },
-        ])
-      } else {
-        console.error("Chat error:", error)
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: "assistant",
-            content:
-              "Desculpe, tive um problema de conexão. Verifique sua conexão e tente novamente! 🚀",
-            timestamp: new Date().toISOString(),
-            suggestions: ["Tentar novamente", "Ver destinos disponíveis", "Quais são os requisitos?"],
-          },
-        ])
+      if (error instanceof ApiError) {
+        if (error.status === 401 || error.status === 403) {
+          triggerAuth = true
+          errorMsg =
+            "Para conversar com a ARIA você precisa estar logado. Faça login ou crie sua conta! 🚀"
+          suggestions = ["Criar conta", "Fazer login"]
+        } else if (error.status === 502) {
+          errorMsg =
+            "A ARIA está temporariamente indisponível. O serviço de IA pode estar em manutenção. Tente novamente em breve! 🛸"
+        } else if (error.status === 500) {
+          errorMsg =
+            "Erro interno no servidor. Verifique se o GEMINI_API_KEY está configurado corretamente no backend."
+        }
       }
+
+      if (triggerAuth) openAuthModal()
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: errorMsg,
+          timestamp: new Date().toISOString(),
+          suggestions,
+        },
+      ])
     } finally {
       setIsTyping(false)
     }
@@ -134,20 +238,14 @@ export default function AssistentePage() {
     sendMessage(input)
   }
 
-  const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion)
-  }
-
   const resetChat = () => {
     setMessages([{ ...welcomeMessage, timestamp: new Date().toISOString() }])
   }
 
-  // Renderiza o conteúdo da mensagem respeitando markdown simples
   const renderMessageContent = (content: string) => {
     return content.split("\n").map((line, i) => {
       if (!line.trim()) return null
 
-      // Linha com **negrito**
       if (line.includes("**")) {
         const parts = line.split(/(\*\*[^*]+\*\*)/)
         return (
@@ -163,7 +261,6 @@ export default function AssistentePage() {
         )
       }
 
-      // Bullet point
       if (line.startsWith("•") || line.startsWith("-")) {
         return (
           <p key={i} className="mb-1 last:mb-0 ml-2">
@@ -192,7 +289,7 @@ export default function AssistentePage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-6"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4 shadow-lg shadow-primary/20">
               <Sparkles className="h-8 w-8 text-primary-foreground" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold mb-2">ARIA — Assistente OrbitBook</h1>
@@ -202,7 +299,7 @@ export default function AssistentePage() {
           </motion.div>
 
           {/* Chat Area */}
-          <div className="flex-1 glass rounded-2xl flex flex-col overflow-hidden">
+          <div className="flex-1 glass rounded-2xl flex flex-col overflow-hidden border border-border/30">
             {/* Messages */}
             <ScrollArea ref={scrollRef} className="flex-1 p-4 sm:p-6">
               <div className="space-y-6">
@@ -220,7 +317,7 @@ export default function AssistentePage() {
                         className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                           message.role === "assistant"
                             ? "bg-gradient-to-br from-primary to-accent"
-                            : "bg-secondary"
+                            : "bg-secondary border border-border/50"
                         }`}
                       >
                         {message.role === "assistant" ? (
@@ -236,13 +333,22 @@ export default function AssistentePage() {
                           className={`inline-block max-w-[85%] rounded-2xl px-4 py-3 text-left ${
                             message.role === "user"
                               ? "bg-primary text-primary-foreground rounded-tr-md"
-                              : "bg-card rounded-tl-md"
+                              : "bg-card/80 backdrop-blur-sm rounded-tl-md border border-border/30"
                           }`}
                         >
-                          <div className="prose prose-sm prose-invert max-w-none">
+                          <div className="prose prose-sm prose-invert max-w-none text-sm">
                             {renderMessageContent(message.content)}
                           </div>
                         </div>
+
+                        {/* Recommendation cards */}
+                        {message.role === "assistant" &&
+                          message.destinos_recomendados &&
+                          message.destinos_recomendados.length > 0 && (
+                            <div className="max-w-[85%]">
+                              <RecommendationCards destinos={message.destinos_recomendados} />
+                            </div>
+                          )}
 
                         {/* Suggestions */}
                         {message.suggestions && message.suggestions.length > 0 && (
@@ -257,8 +363,8 @@ export default function AssistentePage() {
                                 key={suggestion}
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleSuggestionClick(suggestion)}
-                                className="text-xs"
+                                onClick={() => sendMessage(suggestion)}
+                                className="text-xs border-border/50 hover:border-primary/40"
                                 disabled={isTyping}
                               >
                                 {suggestion}
@@ -281,7 +387,7 @@ export default function AssistentePage() {
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                       <Bot className="h-4 w-4 text-primary-foreground" />
                     </div>
-                    <div className="bg-card rounded-2xl rounded-tl-md px-4 py-3">
+                    <div className="bg-card/80 rounded-2xl rounded-tl-md px-4 py-3 border border-border/30">
                       <div className="flex gap-1">
                         <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
                         <span
@@ -313,7 +419,7 @@ export default function AssistentePage() {
                       key={suggestion}
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleSuggestionClick(suggestion)}
+                      onClick={() => sendMessage(suggestion)}
                       className="text-xs"
                     >
                       {suggestion}
@@ -324,20 +430,24 @@ export default function AssistentePage() {
             )}
 
             {/* Input */}
-            <div className="p-4 sm:p-6 border-t border-border/50">
+            <div className="p-4 sm:p-6 border-t border-border/30">
               <form onSubmit={handleSubmit} className="flex gap-3">
                 <Input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Digite sua mensagem..."
-                  className="flex-1 bg-card"
+                  className="flex-1 bg-card/50 border-border/40 focus:border-primary/40"
                   disabled={isTyping}
                 />
-                <Button type="submit" disabled={!input.trim() || isTyping}>
+                <Button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className="bg-primary hover:bg-primary/90"
+                >
                   <Send className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="outline" onClick={resetChat} disabled={isTyping}>
+                <Button type="button" variant="outline" onClick={resetChat} disabled={isTyping} className="border-border/50">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </form>
@@ -356,13 +466,13 @@ export default function AssistentePage() {
             </p>
             <div className="flex justify-center gap-3">
               <Link href="/explorar">
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2 border-border/50">
                   <Rocket className="h-4 w-4" />
                   Ver Destinos
                 </Button>
               </Link>
               <Link href="/dashboard">
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2 border-border/50">
                   Minhas Reservas
                   <ArrowRight className="h-4 w-4" />
                 </Button>
