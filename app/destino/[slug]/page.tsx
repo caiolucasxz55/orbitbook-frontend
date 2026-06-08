@@ -62,6 +62,11 @@ const minReturn = (dep: string) => {
   d.setDate(d.getDate() + 1)
   return d.toISOString().split("T")[0]
 }
+const addDays = (base: string, days: number) => {
+  const d = new Date(base)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split("T")[0]
+}
 
 export default function DestinoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
@@ -426,7 +431,7 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                   </div>
                 ) : (
                   /* Booking form */
-                  <div className="glass rounded-2xl p-6">
+                  <div className="rounded-2xl p-6 bg-card border border-primary/30 shadow-2xl shadow-black/40 backdrop-blur-md">
                     {/* Price */}
                     <div className="mb-5">
                       <div className="flex items-baseline gap-2">
@@ -449,8 +454,8 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                     <div className="space-y-4">
                       {/* Departure date */}
                       <div>
-                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                          <CalendarDays className="h-3.5 w-3.5" />
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-1.5">
+                          <CalendarDays className="h-3.5 w-3.5 text-primary" />
                           Data de Partida
                         </label>
                         <input
@@ -461,14 +466,35 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                             setDepartureDate(e.target.value)
                             if (returnDate && returnDate <= e.target.value) setReturnDate("")
                           }}
-                          className="w-full h-10 px-3 rounded-lg bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
+                          className="w-full h-10 px-3 rounded-lg bg-secondary border border-white/20 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors"
                         />
+                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                          {([{ label: "+1 mês", days: 30 }, { label: "+3 meses", days: 90 }, { label: "+6 meses", days: 180 }] as const).map(({ label, days }) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => {
+                                const dep = addDays(today(), days)
+                                setDepartureDate(dep)
+                                if (returnDate && returnDate <= dep) setReturnDate("")
+                              }}
+                              className={cn(
+                                "text-xs px-2.5 py-1 rounded-md border transition-colors",
+                                departureDate === addDays(today(), days)
+                                  ? "bg-primary/30 text-primary border-primary/50"
+                                  : "bg-white/5 text-foreground/60 border-white/15 hover:bg-white/10 hover:text-foreground hover:border-white/25"
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Return date */}
                       <div>
-                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                          <CalendarDays className="h-3.5 w-3.5" />
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-1.5">
+                          <CalendarDays className="h-3.5 w-3.5 text-primary" />
                           Data de Retorno
                         </label>
                         <input
@@ -477,17 +503,36 @@ export default function DestinoPage({ params }: { params: Promise<{ slug: string
                           min={departureDate ? minReturn(departureDate) : today()}
                           disabled={!departureDate}
                           onChange={(e) => setReturnDate(e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full h-10 px-3 rounded-lg bg-secondary border border-white/20 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         />
+                        {departureDate && (
+                          <div className="flex gap-1.5 mt-2 flex-wrap">
+                            {([{ label: "7 dias", days: 7 }, { label: "14 dias", days: 14 }, { label: "30 dias", days: 30 }] as const).map(({ label, days }) => (
+                              <button
+                                key={label}
+                                type="button"
+                                onClick={() => setReturnDate(addDays(departureDate, days))}
+                                className={cn(
+                                  "text-xs px-2.5 py-1 rounded-md border transition-colors",
+                                  returnDate === addDays(departureDate, days)
+                                    ? "bg-primary/30 text-primary border-primary/50"
+                                    : "bg-white/5 text-foreground/60 border-white/15 hover:bg-white/10 hover:text-foreground hover:border-white/25"
+                                )}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Passengers */}
                       <div>
-                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                          <Users className="h-3.5 w-3.5" />
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground/80 mb-1.5">
+                          <Users className="h-3.5 w-3.5 text-primary" />
                           Passageiros
                         </label>
-                        <div className="flex items-center justify-between h-10 px-3 rounded-lg bg-card border border-border">
+                        <div className="flex items-center justify-between h-10 px-3 rounded-lg bg-secondary border border-white/20">
                           <button
                             onClick={() => setPassengers((p) => Math.max(1, p - 1))}
                             disabled={passengers <= 1}
