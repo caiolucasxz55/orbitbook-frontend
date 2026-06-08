@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,9 +59,7 @@ export function AuthModal() {
   return (
     <Dialog open={authModalOpen} onOpenChange={closeAuthModal}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden border-border/50 bg-card">
-        <VisuallyHidden>
-          <DialogTitle>Acesse sua conta OrbitBook</DialogTitle>
-        </VisuallyHidden>
+        <DialogTitle className="sr-only">Acesse sua conta OrbitBook</DialogTitle>
         {/* Header com gradiente */}
         <div className="relative bg-gradient-to-br from-primary/20 via-accent/10 to-background px-6 pt-8 pb-6 text-center border-b border-border/30">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
