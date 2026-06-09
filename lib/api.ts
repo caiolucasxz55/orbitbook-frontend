@@ -1,6 +1,6 @@
 import type { Destination, Badge, TechnicalSpec } from "@/types"
 
-const BASE_URL = "http://localhost:8000"
+const BASE_URL = "https://orbitbook-api.wittybush-4b565985.southafricanorth.azurecontainerapps.io"
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null
